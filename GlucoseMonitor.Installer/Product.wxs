@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Glucose Monitor"
+      Manufacturer="FloatingGlucose"
+      Version="1.0.0"
+      UpgradeCode="{5E6D0C02-6F65-4A54-83D6-5C0CF2F1C3A4}"
+      InstallerVersion="500"
+      Language="1033"
+      Scope="perUser"
+      Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Glucose Monitor is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Install location: LocalAppData\GlucoseMonitor (per-user) -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="GlucoseMonitor" />
+    </StandardDirectory>
+
+    <!-- Shortcuts locations -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Glucose Monitor" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <!-- Author a ComponentGroup here that harvests files from the publish/bin folder -->
+    <ComponentGroup Id="AppFilesGroup" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="{A1D5CFA2-3C93-4E5E-B21D-6E0B2E2CFEAA}">
+        <File Source="$(var.HarvestDirectory)\\GlucoseMonitor.UI.exe" />
+        <RegistryValue Root="HKCU" Key="Software\FloatingGlucose" Name="AppInstalled" Value="1" Type="integer" KeyPath="yes" />
+        <RemoveFolder Id="RemoveInstallDir" Directory="INSTALLFOLDER" On="uninstall" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Shortcuts -->
+    <Component Id="StartMenuShortcut" Directory="ApplicationProgramsFolder">
+      <Shortcut Id="StartMenuShortcutExe"
+                Name="Glucose Monitor"
+                Target="[INSTALLFOLDER]GlucoseMonitor.UI.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <!-- KeyPath via registry to anchor the component (per-user) -->
+      <RegistryValue Root="HKCU" Key="Software\FloatingGlucose" Name="Installed" Value="1" Type="integer" KeyPath="yes" />
+      <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder">
+      <Shortcut Id="DesktopShortcutExe"
+                Name="Glucose Monitor"
+                Target="[INSTALLFOLDER]GlucoseMonitor.UI.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\FloatingGlucose" Name="InstalledDesktop" Value="1" Type="integer" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="MainFeature" Title="Glucose Monitor" Level="1">
+      <ComponentGroupRef Id="AppFilesGroup" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- Optional: ARP metadata -->
+    <Property Id="ARPCONTACT" Value="support@floatingglucose.local" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/your-org/FloatingGlucose" />
+  </Package>
+</Wix>

@@ -1,0 +1,71 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# C# files should use CRLF on Windows
+*.cs text eol=crlf diff=csharp
+
+# Solution and project files
+*.sln text eol=crlf merge=union
+*.csproj text eol=crlf merge=union
+*.vbproj text eol=crlf merge=union
+*.fsproj text eol=crlf merge=union
+*.dbproj text eol=crlf merge=union
+*.wixproj text eol=crlf
+
+# Configuration files
+*.config text eol=crlf
+*.json text eol=crlf
+*.xml text eol=crlf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=crlf
+
+# WiX files
+*.wxs text eol=crlf
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+
+# Archives
+*.zip binary
+*.7z binary
+*.tar.gz binary
+*.rar binary
+
+# Executables and libraries
+*.exe binary
+*.dll binary
+*.msi binary
+*.lib binary
+*.pdb binary
+
+# Office documents
+*.doc diff=astextplain
+*.DOC diff=astextplain
+*.docx diff=astextplain
+*.DOCX diff=astextplain
+*.dot diff=astextplain
+*.DOT diff=astextplain
+*.pdf diff=astextplain
+*.PDF diff=astextplain
+*.rtf diff=astextplain
+*.RTF diff=astextplain
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# PowerShell scripts
+*.ps1 text eol=crlf
+
+# Batch files
+*.bat text eol=crlf
+*.cmd text eol=crlf

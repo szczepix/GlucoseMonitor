@@ -1,0 +1,12 @@
+﻿<Project Sdk="WixToolset.Sdk/6.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <!-- Pass MSBuild property as WiX preprocessor variable -->
+    <DefineConstants>WixUILicenseRtf=license.rtf;HarvestDirectory=$(HarvestDirectory)</DefineConstants>
+    <!-- Default directory where we harvest application files from -->
+    <HarvestDirectory>..\GlucoseMonitor.UI\bin\$(Configuration)\net9.0-windows</HarvestDirectory>
+  </PropertyGroup>
+
+</Project>
