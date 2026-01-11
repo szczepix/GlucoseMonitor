@@ -7,11 +7,22 @@ using Windows.Graphics;
 using WinRT.Interop;
 using Windows.Media.Core;
 using Windows.Media.Playback;
+using System.Runtime.InteropServices;
 
 namespace GlucoseMonitor.UI;
 
 public sealed partial class MainWindow : Window
 {
+    // P/Invoke for system sounds
+    [DllImport("user32.dll")]
+    private static extern bool MessageBeep(uint uType);
+
+    private const uint MB_OK = 0x00000000;
+    private const uint MB_ICONHAND = 0x00000010;      // Critical/Error
+    private const uint MB_ICONQUESTION = 0x00000020;
+    private const uint MB_ICONEXCLAMATION = 0x00000030; // Warning
+    private const uint MB_ICONASTERISK = 0x00000040;   // Information
+
     private readonly DispatcherTimer _refreshTimer;
     private bool _isMonitoring = true;
     private int _iterationCount = 0;
@@ -207,6 +218,10 @@ public sealed partial class MainWindow : Window
         if (OpacityValueText != null)
         {
             OpacityValueText.Text = $"{(int)OpacitySlider.Value}%";
+
+            // Update overlay window opacity
+            double opacity = OpacitySlider.Value / 100.0;
+            App.OverlayWindowInstance?.UpdateOpacity(opacity);
         }
     }
 
@@ -274,15 +289,38 @@ public sealed partial class MainWindow : Window
         if (_lastAlarmTimes.TryGetValue(category, out var last) && DateTime.Now - last < _alarmCooldown)
             return;
 
-        // Play system sound
-        try
-        {
-            // WinUI 3 doesn't have direct SystemSounds - use MediaPlayer
-            App.Logger?.LogInfo($"Alarm: {category} ({reading.Value:F0})");
-        }
-        catch { }
+        // Play alarm sound based on category
+        PlayAlarmSound(category);
+        App.Logger?.LogInfo($"Alarm: {category} ({reading.Value:F0})");
 
         _lastAlarmTimes[category] = DateTime.Now;
+    }
+
+    private void PlayAlarmSound(string category)
+    {
+        try
+        {
+            // Use system beep sounds - urgent uses critical sound, normal uses warning
+            uint soundType = category switch
+            {
+                "UrgentHigh" or "UrgentLow" => MB_ICONHAND,      // Critical beep
+                "High" or "Low" => MB_ICONEXCLAMATION,           // Warning beep
+                _ => MB_ICONASTERISK                              // Info beep
+            };
+
+            // Play the beep multiple times for urgent alarms
+            int repeatCount = category.StartsWith("Urgent") ? 3 : 1;
+            for (int i = 0; i < repeatCount; i++)
+            {
+                MessageBeep(soundType);
+                if (i < repeatCount - 1)
+                    Thread.Sleep(300);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Logger?.LogError($"Failed to play alarm: {ex.Message}");
+        }
     }
 
     private string? GetAlarmCategory(double value)

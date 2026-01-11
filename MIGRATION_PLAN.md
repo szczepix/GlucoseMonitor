@@ -15,6 +15,7 @@
 |---------|---------|
 | Microsoft.WindowsAppSDK | 1.8.251106002 |
 | Microsoft.Windows.SDK.BuildTools | 10.0.26100.7175 |
+| H.NotifyIcon.WinUI | 2.2.0 |
 | Target Framework | net9.0-windows10.0.26100.0 |
 | Min Platform Version | 10.0.22621.0 (Windows 11 22H2) |
 
@@ -47,6 +48,23 @@
    - `.github/workflows/build.yml` - CI for PRs and pushes
    - `.github/workflows/release.yml` - Automated releases on tags
 
+8. **Sound alarms implemented**:
+   - Uses Win32 `MessageBeep` API for system sounds
+   - Critical sound for urgent high/low, warning sound for high/low
+   - Repeats 3x for urgent alarms
+   - 5-minute cooldown between same alarm type
+
+9. **Window opacity implemented**:
+   - Uses Win32 `SetLayeredWindowAttributes` API
+   - Opacity slider in settings controls overlay transparency (20-100%)
+   - Persisted in app state
+
+10. **System tray icon added**:
+    - Uses H.NotifyIcon.WinUI package
+    - Left-click shows overlay, double-click shows settings
+    - Context menu: Show Overlay, Settings, Exit
+    - Icon disposed on app exit
+
 ---
 
 ## Pending Tasks
@@ -59,18 +77,7 @@
 - [ ] History table displays readings
 - [ ] Delta and time ago display correctly
 
-### Task 2: Test Alarms
-
-- [ ] Alarm thresholds can be configured
-- [ ] Sound alarms trigger correctly (note: currently logs only, no sound implementation)
-
-### Task 3: Known Issues to Address
-
-1. **Window Opacity**: WinUI 3 doesn't have direct window opacity - needs composition API
-2. **Sound Alarms**: MediaPlayer implementation needs to be added
-3. **System Tray**: Consider adding system tray icon for minimizing
-
-### Task 4: Update Installer (WiX)
+### Task 2: Update Installer (WiX)
 
 After WinUI 3 migration is validated:
 - Update `GlucoseMonitor.Installer` project for new output path
@@ -83,12 +90,12 @@ After WinUI 3 migration is validated:
 
 ```
 GlucoseMonitor.UI/
-├── App.xaml                 # Application resources (XamlControlsResources)
-├── App.xaml.cs              # App entry point, DI setup, static service references
+├── App.xaml                 # Application resources
+├── App.xaml.cs              # App entry point, DI setup, system tray icon
 ├── MainWindow.xaml          # Settings UI (XAML)
-├── MainWindow.xaml.cs       # Settings logic, monitoring control, alarms
+├── MainWindow.xaml.cs       # Settings logic, monitoring, alarms with sound
 ├── OverlayWindow.xaml       # Floating overlay UI (XAML)
-├── OverlayWindow.xaml.cs    # Overlay logic, dragging, position save/load
+├── OverlayWindow.xaml.cs    # Overlay logic, dragging, opacity, position
 ├── app.manifest             # DPI/compatibility settings
 ├── GlucoseMonitor.UI.csproj # WinUI 3 project file
 └── Services/

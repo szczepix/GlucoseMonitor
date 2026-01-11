@@ -6,19 +6,36 @@ using Microsoft.UI;
 using GlucoseMonitor.Core.Models;
 using Windows.Graphics;
 using WinRT.Interop;
+using System.Runtime.InteropServices;
 
 namespace GlucoseMonitor.UI;
 
 public sealed partial class OverlayWindow : Window
 {
+    // P/Invoke for window transparency
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_LAYERED = 0x80000;
+    private const uint LWA_ALPHA = 0x2;
+
     private DispatcherTimer _refreshTimer = null!;
     private readonly TextBlock[] _valCells;
     private readonly TextBlock[] _chgCells;
     private readonly TextBlock[] _timeCells;
     private AppWindow? _appWindow;
+    private IntPtr _hwnd;
     private bool _isDragging;
     private PointInt32 _dragStartPosition;
     private PointInt32 _windowStartPosition;
+    private double _opacity = 0.8;
 
     public OverlayWindow()
     {
@@ -40,8 +57,8 @@ public sealed partial class OverlayWindow : Window
 
     private void SetupWindow()
     {
-        var hwnd = WindowNative.GetWindowHandle(this);
-        var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
+        _hwnd = WindowNative.GetWindowHandle(this);
+        var windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
         if (_appWindow != null)
@@ -66,8 +83,27 @@ public sealed partial class OverlayWindow : Window
         var state = App.StateManager.LoadCustomState();
         if (state.TryGetValue("Opacity", out var opacityStr) && double.TryParse(opacityStr, out var opacity))
         {
-            // WinUI 3 doesn't have direct window opacity - would need composition
+            _opacity = opacity;
         }
+        SetWindowOpacity(_opacity);
+    }
+
+    private void SetWindowOpacity(double opacity)
+    {
+        _opacity = Math.Clamp(opacity, 0.1, 1.0);
+
+        // Set layered window style
+        int exStyle = GetWindowLong(_hwnd, GWL_EXSTYLE);
+        SetWindowLong(_hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+
+        // Set opacity (0-255)
+        byte alpha = (byte)(_opacity * 255);
+        SetLayeredWindowAttributes(_hwnd, 0, alpha, LWA_ALPHA);
+    }
+
+    public void UpdateOpacity(double opacity)
+    {
+        SetWindowOpacity(opacity);
     }
 
     private void SetupDragging()
