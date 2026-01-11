@@ -1,0 +1,325 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Windowing;
+using GlucoseMonitor.Core.Models;
+using GlucoseMonitor.UI.Services;
+using Windows.Graphics;
+using WinRT.Interop;
+using Windows.Media.Core;
+using Windows.Media.Playback;
+
+namespace GlucoseMonitor.UI;
+
+public sealed partial class MainWindow : Window
+{
+    private readonly DispatcherTimer _refreshTimer;
+    private bool _isMonitoring = true;
+    private int _iterationCount = 0;
+    private readonly Queue<GlucoseReading> _glucoseHistory = new();
+    private readonly Dictionary<string, DateTime> _lastAlarmTimes = new();
+    private readonly TimeSpan _alarmCooldown = TimeSpan.FromMinutes(5);
+    private AppWindow? _appWindow;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        SetupWindow();
+        LoadConfiguration();
+
+        // Initialize logger
+        App.Logger = new WinUILogger(this);
+
+        _refreshTimer = new DispatcherTimer();
+        _refreshTimer.Interval = TimeSpan.FromMinutes(1);
+        _refreshTimer.Tick += async (s, e) => await RefreshGlucoseAsync();
+
+        // Start monitoring automatically
+        if (App.GlucoseService.ValidateConfiguration())
+        {
+            _refreshTimer.Start();
+            _ = RefreshGlucoseAsync();
+        }
+
+        App.Logger?.LogInfo("Glucose Monitor started");
+    }
+
+    private void SetupWindow()
+    {
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+        _appWindow = AppWindow.GetFromWindowId(windowId);
+
+        if (_appWindow != null)
+        {
+            _appWindow.Resize(new SizeInt32(500, 750));
+            Title = "Glucose Monitor - Settings";
+        }
+    }
+
+    private void LoadConfiguration()
+    {
+        var (url, token, units, interval) = App.ConfigService.LoadConfiguration();
+        NightscoutUrlBox.Text = url;
+        AccessTokenBox.Password = token;
+
+        // Load state
+        var state = App.StateManager.LoadCustomState();
+        if (state.TryGetValue("Opacity", out var opStr) && double.TryParse(opStr, out var op))
+            OpacitySlider.Value = op * 100;
+        if (state.TryGetValue("RecentFetchCount", out var rfcStr) && double.TryParse(rfcStr, out var rfc))
+            FetchCountBox.Value = rfc;
+        if (state.TryGetValue("EnableSound", out var esStr) && bool.TryParse(esStr, out var es))
+            EnableAlarmsCheck.IsChecked = es;
+        if (state.TryGetValue("UrgentHigh", out var uhStr) && double.TryParse(uhStr, out var uh))
+            UrgentHighBox.Value = uh;
+        if (state.TryGetValue("High", out var hStr) && double.TryParse(hStr, out var h))
+            HighBox.Value = h;
+        if (state.TryGetValue("Low", out var lStr) && double.TryParse(lStr, out var l))
+            LowBox.Value = l;
+        if (state.TryGetValue("UrgentLow", out var ulStr) && double.TryParse(ulStr, out var ul))
+            UrgentLowBox.Value = ul;
+    }
+
+    private void SaveState()
+    {
+        var state = new Dictionary<string, string>
+        {
+            ["Opacity"] = (OpacitySlider.Value / 100.0).ToString(),
+            ["RecentFetchCount"] = FetchCountBox.Value.ToString(),
+            ["EnableSound"] = (EnableAlarmsCheck.IsChecked ?? true).ToString(),
+            ["UrgentHigh"] = UrgentHighBox.Value.ToString(),
+            ["High"] = HighBox.Value.ToString(),
+            ["Low"] = LowBox.Value.ToString(),
+            ["UrgentLow"] = UrgentLowBox.Value.ToString()
+        };
+        App.StateManager.SaveState(state);
+    }
+
+    private async void TestConnection_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            App.Logger?.LogInfo("Testing connection...");
+            App.GlucoseService.NightscoutUrl = NightscoutUrlBox.Text;
+            App.GlucoseService.AccessToken = AccessTokenBox.Password;
+
+            if (!App.GlucoseService.ValidateConfiguration())
+            {
+                App.Logger?.LogError("Invalid configuration");
+                return;
+            }
+
+            var count = (int)FetchCountBox.Value;
+            var readings = await App.GlucoseService.GetRecentGlucoseAsync(count);
+            FetchStatusText.Text = $"Fetched: {readings?.Count ?? 0} (requested {count})";
+
+            if (readings != null && readings.Count > 0)
+            {
+                var latest = readings.Last();
+                UpdateGlucoseDisplay(latest);
+                App.OverlayWindowInstance?.UpdateGlucoseDisplay(latest);
+                App.OverlayWindowInstance?.UpdateHistoryDisplay(readings);
+                App.Logger?.LogInfo($"Connection OK: {latest.Value} {latest.Units}");
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Logger?.LogError($"Test failed: {ex.Message}");
+        }
+    }
+
+    private void SaveConfig_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            App.ConfigService.SaveConfiguration(
+                NightscoutUrlBox.Text,
+                AccessTokenBox.Password,
+                "mg",
+                (int)IntervalBox.Value);
+
+            App.GlucoseService.NightscoutUrl = NightscoutUrlBox.Text;
+            App.GlucoseService.AccessToken = AccessTokenBox.Password;
+
+            SaveState();
+            App.Logger?.LogInfo("Configuration saved");
+        }
+        catch (Exception ex)
+        {
+            App.Logger?.LogError($"Save failed: {ex.Message}");
+        }
+    }
+
+    private void ToggleMonitoring_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isMonitoring)
+        {
+            _refreshTimer.Stop();
+            _isMonitoring = false;
+            ToggleMonitoringBtn.Content = "Start Service";
+            App.Logger?.LogInfo("Monitoring stopped");
+        }
+        else
+        {
+            if (!App.GlucoseService.ValidateConfiguration())
+            {
+                App.Logger?.LogError("Please configure Nightscout URL first");
+                return;
+            }
+
+            _refreshTimer.Start();
+            _isMonitoring = true;
+            ToggleMonitoringBtn.Content = "Stop Service";
+            _ = RefreshGlucoseAsync();
+            App.Logger?.LogInfo("Monitoring started");
+        }
+    }
+
+    private void ToggleOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.OverlayWindowInstance != null)
+        {
+            try
+            {
+                App.OverlayWindowInstance.Close();
+                App.OverlayWindowInstance = null;
+                ToggleOverlayBtn.Content = "Show Overlay";
+                App.Logger?.LogInfo("Overlay hidden");
+            }
+            catch
+            {
+                App.OverlayWindowInstance = new OverlayWindow();
+                App.OverlayWindowInstance.Activate();
+                ToggleOverlayBtn.Content = "Hide Overlay";
+            }
+        }
+        else
+        {
+            App.OverlayWindowInstance = new OverlayWindow();
+            App.OverlayWindowInstance.Activate();
+            ToggleOverlayBtn.Content = "Hide Overlay";
+            App.Logger?.LogInfo("Overlay shown");
+        }
+    }
+
+    private void OpacitySlider_Changed(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (OpacityValueText != null)
+        {
+            OpacityValueText.Text = $"{(int)OpacitySlider.Value}%";
+        }
+    }
+
+    private void ClearLog_Click(object sender, RoutedEventArgs e)
+    {
+        LogText.Text = "";
+        App.Logger?.LogInfo("Log cleared");
+    }
+
+    private void Exit_Click(object sender, RoutedEventArgs e)
+    {
+        SaveState();
+        App.ExitApplication();
+    }
+
+    private async Task RefreshGlucoseAsync()
+    {
+        try
+        {
+            _iterationCount++;
+            var count = (int)FetchCountBox.Value;
+            var readings = await App.GlucoseService.GetRecentGlucoseAsync(count);
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                FetchStatusText.Text = $"Fetched: {readings?.Count ?? 0} (requested {count})";
+            });
+
+            if (readings != null && readings.Count > 0)
+            {
+                var latest = readings.Last();
+                UpdateGlucoseDisplay(latest);
+                App.OverlayWindowInstance?.UpdateGlucoseDisplay(latest);
+                App.OverlayWindowInstance?.UpdateHistoryDisplay(readings);
+                EvaluateAlarm(latest);
+
+                App.Logger?.LogInfo($"Glucose: {latest.Value:F0} {latest.GetDirectionArrow()} (iter {_iterationCount})");
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Logger?.LogError($"Refresh failed: {ex.Message}");
+        }
+    }
+
+    private void UpdateGlucoseDisplay(GlucoseReading reading)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            GlucoseDisplayText.Text = $"{reading.Value:F0} {reading.GetDirectionArrow()} {reading.Units}";
+            GlucoseDisplayText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                ToWindowsColor(reading.GetGlucoseColor()));
+
+            StatusText.Text = $"Monitoring: {reading.Value:F0} {reading.GetDirectionArrow()} (iter {_iterationCount})\n{DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+        });
+    }
+
+    private void EvaluateAlarm(GlucoseReading reading)
+    {
+        if (!(EnableAlarmsCheck.IsChecked ?? false)) return;
+
+        var category = GetAlarmCategory(reading.Value);
+        if (category == null) return;
+
+        if (_lastAlarmTimes.TryGetValue(category, out var last) && DateTime.Now - last < _alarmCooldown)
+            return;
+
+        // Play system sound
+        try
+        {
+            // WinUI 3 doesn't have direct SystemSounds - use MediaPlayer
+            App.Logger?.LogInfo($"Alarm: {category} ({reading.Value:F0})");
+        }
+        catch { }
+
+        _lastAlarmTimes[category] = DateTime.Now;
+    }
+
+    private string? GetAlarmCategory(double value)
+    {
+        var uh = UrgentHighBox.Value;
+        var h = HighBox.Value;
+        var l = LowBox.Value;
+        var ul = UrgentLowBox.Value;
+
+        if (value >= uh) return "UrgentHigh";
+        if (value >= h) return "High";
+        if (value <= ul) return "UrgentLow";
+        if (value <= l) return "Low";
+        return null;
+    }
+
+    private static Windows.UI.Color ToWindowsColor(System.Drawing.Color c)
+    {
+        return Windows.UI.Color.FromArgb(c.A, c.R, c.G, c.B);
+    }
+
+    public void AppendLog(string message)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
+            LogText.Text += $"[{timestamp}] {message}\n";
+        });
+    }
+
+    public void UpdateStatus(string status, bool isError)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            StatusText.Text = status;
+            StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                isError ? Microsoft.UI.Colors.Red : Microsoft.UI.Colors.Green);
+        });
+    }
+}
