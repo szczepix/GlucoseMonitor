@@ -70,8 +70,8 @@ public partial class OverlayForm : Form
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
 
         _glucoseLabel = new Label
         {
@@ -92,7 +92,7 @@ public partial class OverlayForm : Form
             TextAlign = ContentAlignment.MiddleLeft,
             Dock = DockStyle.Fill,
             BackColor = Color.Black,
-            Margin = new Padding(0, 10,0,5)
+            Margin = new Padding(0, 4, 0, 2)
         };
 
         _timeLabel = new Label
@@ -103,7 +103,7 @@ public partial class OverlayForm : Form
             TextAlign = ContentAlignment.MiddleLeft,
             Dock = DockStyle.Fill,
             BackColor = Color.Black,
-            Margin = new Padding(0,5,0,10)
+            Margin = new Padding(0, 2, 0, 4)
         };
 
         rightPanel.Controls.Add(_deltaLabel, 0, 0);
