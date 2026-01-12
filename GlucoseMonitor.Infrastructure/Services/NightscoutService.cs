@@ -145,7 +145,7 @@ public class NightscoutService : IGlucoseDataService
 
             var response = await _httpClient.GetStringAsync(url.ToString());
             Log.Debug("Response length: {Length} chars", response.Length);
-            Log.Debug("Response preview: {Preview}", response.Substring(0, Math.Min(200, response.Length)));
+            Log.Debug("Response preview: {Preview}", response.AsSpan(0, Math.Min(200, response.Length)).ToString());
             LogMessage?.Invoke(this, $"Received {response.Length} characters for recent entries");
 
             var entries = JsonConvert.DeserializeObject<List<BloodGlucose>>(response) ?? new List<BloodGlucose>();
