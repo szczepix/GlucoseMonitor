@@ -8,6 +8,7 @@ using WinRT.Interop;
 using Windows.Media.Core;
 using Windows.Media.Playback;
 using System.Runtime.InteropServices;
+using Serilog;
 
 namespace GlucoseMonitor.UI;
 
@@ -271,6 +272,8 @@ public sealed partial class MainWindow : Window
         {
             _iterationCount++;
             var count = (int)FetchCountBox.Value;
+            Log.Debug("Fetching glucose data: iteration={Iteration}, count={Count}", _iterationCount, count);
+
             var readings = await App.GlucoseService.GetRecentGlucoseAsync(count);
 
             DispatcherQueue.TryEnqueue(() =>
@@ -281,6 +284,9 @@ public sealed partial class MainWindow : Window
             if (readings != null && readings.Count > 0)
             {
                 var latest = readings.Last();
+                Log.Information("Glucose reading: Value={Value}, Direction={Direction}, Time={Time}, Delta={Delta}",
+                    latest.Value, latest.Direction, latest.Timestamp, latest.Delta);
+
                 UpdateGlucoseDisplay(latest);
                 App.OverlayWindowInstance?.UpdateGlucoseDisplay(latest);
                 App.OverlayWindowInstance?.UpdateHistoryDisplay(readings);
@@ -288,9 +294,14 @@ public sealed partial class MainWindow : Window
 
                 App.Logger?.LogInfo($"Glucose: {latest.Value:F0} {latest.GetDirectionArrow()} (iter {_iterationCount})");
             }
+            else
+            {
+                Log.Warning("No glucose readings returned from API");
+            }
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Failed to refresh glucose data");
             App.Logger?.LogError($"Refresh failed: {ex.Message}");
         }
     }
@@ -312,12 +323,20 @@ public sealed partial class MainWindow : Window
         if (!(EnableAlarmsCheck.IsChecked ?? false)) return;
 
         var category = GetAlarmCategory(reading.Value);
-        if (category == null) return;
+        if (category == null)
+        {
+            Log.Debug("Glucose {Value} is in normal range", reading.Value);
+            return;
+        }
 
         if (_lastAlarmTimes.TryGetValue(category, out var last) && DateTime.Now - last < _alarmCooldown)
+        {
+            Log.Debug("Alarm {Category} suppressed due to cooldown (last: {LastTime})", category, last);
             return;
+        }
 
         // Play alarm sound based on category
+        Log.Warning("ALARM: {Category} - Glucose value {Value} mg/dL", category, reading.Value);
         PlayAlarmSound(category);
         App.Logger?.LogInfo($"Alarm: {category} ({reading.Value:F0})");
 
