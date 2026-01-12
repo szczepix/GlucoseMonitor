@@ -13,6 +13,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Self-contained deployment: bundles .NET runtime and Windows App SDK -->
     <!-- PublishSingleFile creates a single executable with all dependencies -->
+    <!-- Note: These settings apply to all configurations (Debug/Release) -->
+    <!-- Override with: dotnet build --self-contained false (for faster dev builds) -->
     <SelfContained>true</SelfContained>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishSingleFile>true</PublishSingleFile>

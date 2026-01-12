@@ -82,16 +82,38 @@ if ($SelfContained) {
   Write-Info "Publishing UI as self-contained ($Configuration, $Runtime)"
   Write-Info "This creates a single executable with all .NET and Windows App SDK dependencies"
   & dotnet publish $uiProject -c $Configuration -r $Runtime --self-contained true -o $publishDir
+  
+  if ($LASTEXITCODE -ne 0) {
+    Write-Err "dotnet publish failed with exit code $LASTEXITCODE"
+    exit 1
+  }
 } else {
   Write-Info "Building UI as framework-dependent ($Configuration)"
   & dotnet build (Join-Path $uiProject "GlucoseMonitor.UI.csproj") -c $Configuration
+  
+  if ($LASTEXITCODE -ne 0) {
+    Write-Err "dotnet build failed with exit code $LASTEXITCODE"
+    exit 1
+  }
 }
 
 if (-not (Test-Path $publishDir)) {
   Write-Err "Publish/Build output not found: $publishDir"
+  Write-Err "Expected location: $publishDir"
   exit 1
 }
+
+# Verify executable exists
+$exePath = Join-Path $publishDir "GlucoseMonitor.UI.exe"
+if (-not (Test-Path $exePath)) {
+  Write-Err "Executable not found: $exePath"
+  Write-Err "Available files in publish directory:"
+  Get-ChildItem $publishDir | ForEach-Object { Write-Host "  $_" }
+  exit 1
+}
+
 Write-Info "Harvest directory: $publishDir"
+Write-Info "Executable found: $(Get-Item $exePath | Select-Object -ExpandProperty Length) bytes"
 
 # Step 4: Build the installer (WiX v6 SDK-style project)
 Write-Info "Building MSI via WiX v6 SDK project"
