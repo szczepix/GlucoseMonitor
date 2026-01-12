@@ -513,7 +513,7 @@ public class MockGlucoseState
             entries.Add(new SgvEntry
             {
                 Id = Guid.NewGuid().ToString(),
-                Sgv = (int)glucose,
+                Sgv = ((int)glucose).ToString(),
                 Date = entryTime.ToUnixTimeMilliseconds(),
                 DateString = entryTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
                 Trend = GetTrendNumber(CurrentDirection),
@@ -523,7 +523,7 @@ public class MockGlucoseState
                 UtcOffset = 0,
                 SysTime = entryTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
                 Mills = entryTime.ToUnixTimeMilliseconds(),
-                BgDelta = i == 0 ? CurrentDelta : null
+                BgDelta = i == 0 ? CurrentDelta.ToString() : null
             });
         }
 

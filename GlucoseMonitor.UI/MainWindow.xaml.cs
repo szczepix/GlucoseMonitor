@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Windowing;
 using GlucoseMonitor.Core.Models;
+using GlucoseMonitor.Core.Interfaces;
 using GlucoseMonitor.UI.Services;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -27,11 +28,13 @@ public sealed partial class MainWindow : Window
     private readonly DispatcherTimer _refreshTimer;
     private bool _isMonitoring = true;
     private bool _isInitialized = false;
+    private bool _isLoadingProfiles = false;
     private int _iterationCount = 0;
     private readonly Queue<GlucoseReading> _glucoseHistory = new();
     private readonly Dictionary<string, DateTime> _lastAlarmTimes = new();
     private readonly TimeSpan _alarmCooldown = TimeSpan.FromMinutes(5);
     private AppWindow? _appWindow;
+    private List<ServerProfile> _profiles = new();
 
     public MainWindow()
     {
@@ -71,9 +74,8 @@ public sealed partial class MainWindow : Window
 
     private void LoadConfiguration()
     {
-        var (url, token, units, interval) = App.ConfigService.LoadConfiguration();
-        NightscoutUrlBox.Text = url;
-        AccessTokenBox.Password = token;
+        // Load profiles into selector
+        LoadProfiles();
 
         // Load state
         var state = App.StateManager.LoadCustomState();
@@ -91,6 +93,144 @@ public sealed partial class MainWindow : Window
         UrgentHighBox.Value = OverlayWindow.UrgentHighThreshold;
 
         _isInitialized = true;
+    }
+
+    private void LoadProfiles()
+    {
+        _isLoadingProfiles = true;
+        try
+        {
+            // Force reload from disk to pick up any changes
+            App.ProfileManager.ReloadProfiles();
+            _profiles = App.ProfileManager.GetProfiles();
+            ProfileSelector.Items.Clear();
+
+            Log.Debug("Loading {Count} profiles into UI", _profiles.Count);
+            foreach (var profile in _profiles)
+            {
+                Log.Debug("  Profile: {Name} -> {Url}", profile.Name, profile.Url);
+                ProfileSelector.Items.Add(profile);
+            }
+
+            // Select active profile
+            var activeProfile = App.ProfileManager.GetActiveProfile();
+            if (activeProfile != null)
+            {
+                Log.Information("Active profile: {Name} ({Url})", activeProfile.Name, activeProfile.Url);
+                var profileToSelect = _profiles.FirstOrDefault(p => p.Id == activeProfile.Id);
+                if (profileToSelect != null)
+                {
+                    ProfileSelector.SelectedItem = profileToSelect;
+                    LoadProfileIntoUI(profileToSelect);
+                }
+            }
+        }
+        finally
+        {
+            _isLoadingProfiles = false;
+        }
+    }
+
+    private void LoadProfileIntoUI(ServerProfile profile)
+    {
+        ProfileNameBox.Text = profile.Name;
+        NightscoutUrlBox.Text = profile.Url;
+        AccessTokenBox.Password = profile.Token;
+        IntervalBox.Value = profile.Interval;
+    }
+
+    private void ProfileSelector_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingProfiles) return;
+
+        if (ProfileSelector.SelectedItem is ServerProfile profile)
+        {
+            Log.Information("=== PROFILE SWITCH ===");
+            Log.Information("Switching to profile: {Name}", profile.Name);
+            Log.Information("  URL: {Url}", profile.Url);
+            Log.Information("  Token: {HasToken}", !string.IsNullOrEmpty(profile.Token) ? "[set]" : "[empty]");
+
+            LoadProfileIntoUI(profile);
+            App.ProfileManager.SetActiveProfile(profile.Id);
+            App.ApplyProfile(profile);
+
+            // Verify the service was updated
+            Log.Information("Service updated:");
+            Log.Information("  GlucoseService.NightscoutUrl = {Url}", App.GlucoseService.NightscoutUrl);
+
+            App.Logger?.LogInfo($"Switched to profile: {profile.Name} ({profile.Url})");
+
+            // Refresh data with new profile
+            if (_isMonitoring && App.GlucoseService.ValidateConfiguration())
+            {
+                Log.Information("Triggering data refresh with new profile...");
+                _ = RefreshGlucoseAsync();
+            }
+            else
+            {
+                Log.Warning("Not refreshing: monitoring={Monitoring}, valid={Valid}",
+                    _isMonitoring, App.GlucoseService.ValidateConfiguration());
+            }
+        }
+    }
+
+    private void AddProfile_Click(object sender, RoutedEventArgs e)
+    {
+        // Create a new profile with default values
+        var newProfile = new ServerProfile
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "New Profile",
+            Url = "",
+            Token = "",
+            Units = "mg",
+            Interval = 1,
+            IsDefault = false
+        };
+
+        App.ProfileManager.SaveProfile(newProfile);
+        LoadProfiles();
+
+        // Select the new profile
+        var added = _profiles.FirstOrDefault(p => p.Id == newProfile.Id);
+        if (added != null)
+        {
+            ProfileSelector.SelectedItem = added;
+        }
+
+        App.Logger?.LogInfo("Created new profile");
+    }
+
+    private async void DeleteProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileSelector.SelectedItem is not ServerProfile profile)
+        {
+            return;
+        }
+
+        if (_profiles.Count <= 1)
+        {
+            App.Logger?.LogWarning("Cannot delete the last profile");
+            return;
+        }
+
+        // Confirm deletion
+        var dialog = new ContentDialog
+        {
+            Title = "Delete Profile",
+            Content = $"Are you sure you want to delete '{profile.Name}'?",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            XamlRoot = Content.XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+        {
+            App.ProfileManager.DeleteProfile(profile.Id);
+            LoadProfiles();
+            App.Logger?.LogInfo($"Deleted profile: {profile.Name}");
+        }
     }
 
     private void SaveState()
@@ -139,17 +279,35 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            App.ConfigService.SaveConfiguration(
-                NightscoutUrlBox.Text,
-                AccessTokenBox.Password,
-                "mg",
-                (int)IntervalBox.Value);
+            // Get current profile or create new one
+            ServerProfile profile;
+            if (ProfileSelector.SelectedItem is ServerProfile existingProfile)
+            {
+                profile = existingProfile;
+            }
+            else
+            {
+                profile = new ServerProfile { Id = Guid.NewGuid().ToString() };
+            }
 
-            App.GlucoseService.NightscoutUrl = NightscoutUrlBox.Text;
-            App.GlucoseService.AccessToken = AccessTokenBox.Password;
+            // Update profile with UI values
+            profile.Name = string.IsNullOrWhiteSpace(ProfileNameBox.Text) ? "My Nightscout" : ProfileNameBox.Text;
+            profile.Url = NightscoutUrlBox.Text;
+            profile.Token = AccessTokenBox.Password;
+            profile.Units = "mg";
+            profile.Interval = (int)IntervalBox.Value;
+
+            // Save profile (token will be encrypted)
+            App.ProfileManager.SaveProfile(profile);
+
+            // Apply to service
+            App.ApplyProfile(profile);
+
+            // Reload profiles to update UI
+            LoadProfiles();
 
             SaveState();
-            App.Logger?.LogInfo("Configuration saved");
+            App.Logger?.LogInfo($"Profile saved: {profile.Name}");
         }
         catch (Exception ex)
         {

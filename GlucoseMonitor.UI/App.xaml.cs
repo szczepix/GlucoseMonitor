@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using GlucoseMonitor.Core.Interfaces;
+using GlucoseMonitor.Core.Models;
 using GlucoseMonitor.Infrastructure.Services;
 using GlucoseMonitor.Infrastructure.DependencyInjection;
 using GlucoseMonitor.UI.Services;
@@ -18,6 +19,8 @@ public partial class App : Application
     public static IConfigurationService ConfigService { get; private set; } = null!;
     public static IStateManager StateManager { get; private set; } = null!;
     public static IGlucoseHistoryService HistoryService { get; private set; } = null!;
+    public static IProfileManager ProfileManager { get; private set; } = null!;
+    public static ISecureStorageService SecureStorage { get; private set; } = null!;
     public static GlucoseMonitor.Core.Interfaces.ILogger? Logger { get; set; }
 
     public static MainWindow? MainWindowInstance { get; set; }
@@ -75,6 +78,9 @@ public partial class App : Application
         Log.Debug("Initializing services...");
         Services = new ServiceContainer();
 
+        // Create early logger for services initialized before MainWindow
+        var earlyLogger = new SerilogAdapter();
+
         ConfigService = new ConfigurationService();
         Services.RegisterSingleton<IConfigurationService>(ConfigService);
 
@@ -84,14 +90,57 @@ public partial class App : Application
         HistoryService = new GlucoseHistoryService();
         Services.RegisterSingleton<IGlucoseHistoryService>(HistoryService);
 
+        // Initialize secure storage and profile manager
+        SecureStorage = new SecureStorageService(earlyLogger);
+        Services.RegisterSingleton<ISecureStorageService>(SecureStorage);
+
+        ProfileManager = new ProfileManagerService(SecureStorage, earlyLogger);
+        Services.RegisterSingleton<IProfileManager>(ProfileManager);
+
         GlucoseService = new NightscoutService();
         Services.RegisterSingleton<IGlucoseDataService>(GlucoseService);
 
-        // Load configuration
-        var (url, token, units, interval) = ConfigService.LoadConfiguration();
-        GlucoseService.NightscoutUrl = url;
-        GlucoseService.AccessToken = token;
-        GlucoseService.Units = units;
+        // Migrate legacy config or load active profile
+        InitializeProfile();
+    }
+
+    private void InitializeProfile()
+    {
+        // Check if we need to migrate from legacy config
+        if (!ProfileManager.HasProfiles)
+        {
+            Log.Information("No profiles found, checking for legacy configuration...");
+            var (url, token, units, interval) = ConfigService.LoadConfiguration();
+
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                Log.Information("Migrating legacy configuration to profile system");
+                ProfileManager.MigrateFromLegacyConfig(url, token, units, interval);
+            }
+        }
+
+        // Load active profile into GlucoseService
+        var activeProfile = ProfileManager.GetActiveProfile();
+        if (activeProfile != null)
+        {
+            Log.Information("Loading profile: {ProfileName}", activeProfile.Name);
+            ApplyProfile(activeProfile);
+        }
+        else
+        {
+            Log.Warning("No active profile found");
+        }
+    }
+
+    /// <summary>
+    /// Applies a server profile to the glucose service.
+    /// </summary>
+    public static void ApplyProfile(ServerProfile profile)
+    {
+        GlucoseService.NightscoutUrl = profile.Url;
+        GlucoseService.AccessToken = profile.Token;
+        GlucoseService.Units = profile.Units;
+        Log.Information("Applied profile: {ProfileName} ({Url})", profile.Name, profile.Url);
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

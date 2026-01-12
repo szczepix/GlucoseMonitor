@@ -100,7 +100,7 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
         entries.Should().HaveCount(5);
         entries.Should().AllSatisfy(e =>
         {
-            e.Sgv.Should().BeGreaterThan(0);
+            int.Parse(e.Sgv!).Should().BeGreaterThan(0);
             e.Direction.Should().NotBeNullOrEmpty();
         });
     }
@@ -131,7 +131,7 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
 
         var entry = await GetFirstEntryAsync();
 
-        entry.Sgv.Should().BeInRange(minValue, maxValue,
+        int.Parse(entry.Sgv!).Should().BeInRange(minValue, maxValue,
             $"Scenario '{scenario}' should return glucose between {minValue}-{maxValue}");
     }
 
@@ -163,7 +163,7 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
 
         var entry = await GetFirstEntryAsync();
 
-        entry.Sgv.Should().BeGreaterThan(0);
+        int.Parse(entry.Sgv!).Should().BeGreaterThan(0);
         entry.Direction.Should().NotBeNullOrEmpty();
         entry.Type.Should().Be("sgv");
         entry.Device.Should().Be("MockNightscout");
@@ -200,7 +200,7 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
         await SetGlucoseValueAsync(glucoseValue);
 
         var entry = await GetFirstEntryAsync();
-        var alarmCategory = GlucoseThresholds.GetAlarmCategory(entry.Sgv);
+        var alarmCategory = GlucoseThresholds.GetAlarmCategory(int.Parse(entry.Sgv!));
 
         if (expectedCategory != null)
         {
@@ -283,7 +283,7 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
 
         var entry = await GetFirstEntryAsync();
 
-        entry.Sgv.Should().BeCloseTo((int)expectedValue, 5,
+        int.Parse(entry.Sgv!).Should().BeCloseTo((int)expectedValue, 5,
             "Manual value should set glucose to approximately the specified value");
     }
 
