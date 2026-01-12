@@ -4,92 +4,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a .NET 9 WinForms application for monitoring blood glucose levels using the Nightscout API. The solution implements SOLID principles with a clean architecture pattern consisting of four main projects:
+A .NET 9 application for monitoring blood glucose levels using the Nightscout API. The solution uses SOLID principles with clean architecture:
 
 - **GlucoseMonitor.Core**: Domain models and interfaces (IGlucoseDataService, IConfigurationService, IStateManager, ILogger, IGlucoseHistoryService)
-- **GlucoseMonitor.Infrastructure**: Concrete implementations of services (NightscoutService, ConfigurationService, StateManagerService, GlucoseHistoryService) and DI container
-- **GlucoseMonitor.UI**: WinForms UI layer with MainForm and OverlayForm, plus UILogger service
-- **GlucoseMonitor.Tests**: Unit tests
-- **GlucoseMonitor.Installer**: WiX v6 MSI installer project
+- **GlucoseMonitor.Infrastructure**: Service implementations (NightscoutService, ConfigurationService, StateManagerService, GlucoseHistoryService) and custom DI container
+- **GlucoseMonitor.UI**: WinUI 3 application with MainWindow (settings) and OverlayWindow (floating display)
+- **GlucoseMonitor.Tests**: xUnit tests
+- **GlucoseMonitor.Installer**: WiX v6 MSI installer
+
+## Features
+
+- **Floating Overlay**: Always-on-top, draggable glucose display with history table
+- **Glucose Alerts**: Flashing visual alerts for out-of-range values (ADA 2024 guidelines)
+  - Red flash: Urgent low (<54) or urgent high (>250 mg/dL)
+  - Orange flash: Low (<70) or high (>180 mg/dL)
+  - User-adjustable thresholds with reset to defaults
+- **Sound Alarms**: System beeps for glucose alerts with cooldown
+- **System Tray**: Background operation with tray icon and context menu
+- **Window Opacity**: Adjustable overlay transparency (20-100%)
+
+## Technology
+
+- **UI Framework**: WinUI 3 (Windows App SDK 1.8)
+- **Target Framework**: `net9.0-windows10.0.26100.0` (Windows 11 24H2)
+- **Minimum Platform**: Windows 11 22H2 (10.0.22621.0)
 
 ## Development Commands
 
-### Building and Running
 ```bash
 # Build entire solution
 dotnet build
 
-# Build in Release mode
-dotnet build -c Release
+# Build UI project specifically (requires VS components for WinUI 3)
+dotnet build GlucoseMonitor.UI -c Debug
 
-# Run the main application
+# Run the application
 dotnet run --project GlucoseMonitor.UI
 
-# Run tests
+# Run all tests
 dotnet test
 
-# Clean solution
-dotnet clean
+# Run specific test
+dotnet test --filter "FullyQualifiedName~TestMethodName"
 
-# Restore packages
-dotnet restore
+# Build Release
+dotnet build -c Release
 ```
 
 ### Installer Commands
+
 ```bash
-# Publish self-contained single-file (for installer)
+# Publish self-contained single-file
 dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true
 
-# Build MSI installer (WiX v6 SDK-style)
-dotnet build GlucoseMonitor.Installer\GlucoseMonitor.Installer.wixproj -c Release -p:HarvestDirectory="GlucoseMonitor.UI\\bin\\Release\\net9.0-windows\\win-x64\\publish"
-
-# Alternative: Use wix CLI tool
-dotnet tool install --global wix
-wix build .\GlucoseMonitor.Installer\Product.wxs -o .\GlucoseMonitor.Installer\bin\Release\GlucoseMonitor.Installer.msi -dHarvestDirectory=".\\GlucoseMonitor.UI\\bin\\Release\\net9.0-windows\\win-x64\\publish"
+# Build MSI installer (after publishing)
+dotnet build GlucoseMonitor.Installer\GlucoseMonitor.Installer.wixproj -c Release -p:HarvestDirectory="GlucoseMonitor.UI\\bin\\Release\\net9.0-windows10.0.26100.0\\win-x64\\publish"
 ```
 
-## Architecture Patterns
+## Architecture
 
 ### Dependency Injection
-The solution uses a custom ServiceContainer in `GlucoseMonitor.Infrastructure/DependencyInjection/ServiceContainer.cs` for dependency management. Services are registered and resolved through interfaces.
+Custom `ServiceContainer` in `GlucoseMonitor.Infrastructure/DependencyInjection/ServiceContainer.cs` provides singleton registration and resolution via interfaces.
 
 ### Data Flow
 1. **NightscoutService** fetches glucose data from Nightscout API
 2. **GlucoseHistoryService** maintains last 5 readings with trend analysis
 3. **ConfigurationService** persists settings to `%APPDATA%\GlucoseMonitor\config.txt`
-4. **StateManagerService** saves application state to `%APPDATA%\GlucoseMonitor\app_state.txt`
-5. **UILogger** handles logging for the UI layer
+4. **StateManagerService** saves app state to `%APPDATA%\GlucoseMonitor\app_state.txt`
 
-### Key Components
-- **MainForm.cs**: Primary application window with configuration UI
-- **OverlayForm.cs**: Transparent floating overlay displaying glucose readings
-- **GlucoseReading.cs**: Core domain model for glucose data
-- **NightscoutModels.cs**: API response models for Nightscout integration
+### Key UI Components
+- **MainWindow**: Settings window with configuration UI
+- **OverlayWindow**: Transparent floating overlay displaying glucose readings (always-on-top, draggable)
 
 ## Configuration Storage
-The application stores configuration in the following locations:
-- **Config**: `%APPDATA%\GlucoseMonitor\config.txt`
-- **State**: `%APPDATA%\GlucoseMonitor\app_state.txt`
-- **Overlay Position**: `%APPDATA%\GlucoseMonitor\overlay_position.txt`
 
-## Quality Tools
+All user data in `%APPDATA%\GlucoseMonitor\`:
+- `config.txt` - User settings
+- `app_state.txt` - Application state
+- `overlay_position.txt` - Overlay window position
 
-### Code Analysis
-- **Qodana**: JetBrains code analysis configured via `qodana.yaml`
-- Profile: `qodana.starter`
-- IDE: QDNET (for .NET analysis)
+## Platform Requirements
 
-## Dependencies
-- **.NET 9**: Target framework
-- **Windows Forms**: UI framework
-- **Newtonsoft.Json**: JSON processing
-- **System.Drawing.Common**: Graphics support
-- **WiX v6**: MSI installer creation
-
-## Testing
-Unit tests are located in `GlucoseMonitor.Tests/`. The test project references the Core and Infrastructure projects to test service implementations and interfaces.
-
-## Platform Notes
-- **Target OS**: Windows (WinForms application)
-- **Architecture**: Can be built for Any CPU or specific (win-x64 for self-contained)
-- **Framework**: Framework-dependent by default, self-contained option available for installer
+- **OS**: Windows 11 22H2+ (build 22621)
+- **Framework**: .NET 9
+- **Build**: Requires Visual Studio components for WinUI 3 (Windows App SDK 1.8)

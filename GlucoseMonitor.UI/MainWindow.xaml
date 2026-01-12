@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="GlucoseMonitor.UI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Glucose Monitor - Settings">
+
+    <ScrollViewer>
+        <StackPanel Padding="16" Spacing="16">
+
+            <!-- Current Glucose Display -->
+            <Border Background="#FF1a1a1a" CornerRadius="8" Padding="16">
+                <TextBlock x:Name="GlucoseDisplayText"
+                           Text="-- ? -- mg/dL"
+                           FontFamily="Consolas"
+                           FontSize="28"
+                           FontWeight="Bold"
+                           Foreground="Lime"
+                           HorizontalAlignment="Center"/>
+            </Border>
+
+            <!-- Nightscout Configuration -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Nightscout Configuration" FontWeight="SemiBold" FontSize="16"/>
+
+                <TextBox x:Name="NightscoutUrlBox"
+                         Header="Nightscout URL"
+                         PlaceholderText="https://your-site.herokuapp.com"/>
+
+                <PasswordBox x:Name="AccessTokenBox"
+                             Header="Access Token"
+                             PlaceholderText="Your API token"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="TestConnectionBtn" Content="Test Connection" Click="TestConnection_Click"/>
+                    <Button x:Name="SaveConfigBtn" Content="Save Config" Style="{StaticResource AccentButtonStyle}" Click="SaveConfig_Click"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Polling Settings -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Polling Settings" FontWeight="SemiBold" FontSize="16"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <NumberBox x:Name="IntervalBox"
+                               Header="Interval (min)"
+                               Value="1"
+                               Minimum="1"
+                               Maximum="60"
+                               SpinButtonPlacementMode="Compact"/>
+
+                    <NumberBox x:Name="FetchCountBox"
+                               Header="Fetch count"
+                               Value="20"
+                               Minimum="5"
+                               Maximum="288"
+                               SpinButtonPlacementMode="Compact"/>
+                </StackPanel>
+
+                <TextBlock x:Name="FetchStatusText" Text="Fetched: -" Foreground="Gray"/>
+            </StackPanel>
+
+            <!-- Overlay Controls -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Overlay Controls" FontWeight="SemiBold" FontSize="16"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Slider x:Name="OpacitySlider"
+                            Header="Opacity"
+                            Width="200"
+                            Minimum="20"
+                            Maximum="100"
+                            Value="80"
+                            ValueChanged="OpacitySlider_Changed"/>
+                    <TextBlock x:Name="OpacityValueText" Text="80%" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="ToggleMonitoringBtn" Content="Stop Service" Click="ToggleMonitoring_Click"/>
+                    <Button x:Name="ToggleOverlayBtn" Content="Show Overlay" Click="ToggleOverlay_Click"/>
+                    <Button Content="Clear Log" Click="ClearLog_Click"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Glucose Alert Thresholds -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Glucose Alert Thresholds (mg/dL)" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock Text="Based on ADA 2024 guidelines for Type 1 Diabetes" Foreground="Gray" FontSize="12"/>
+
+                <CheckBox x:Name="EnableAlarmsCheck" Content="Enable sound alarms" IsChecked="True"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <NumberBox x:Name="UrgentLowBox" Header="Urgent Low" Value="54" Minimum="40" Maximum="100" SpinButtonPlacementMode="Compact"
+                               ValueChanged="ThresholdChanged"/>
+                    <NumberBox x:Name="LowBox" Header="Low" Value="70" Minimum="50" Maximum="120" SpinButtonPlacementMode="Compact"
+                               ValueChanged="ThresholdChanged"/>
+                    <NumberBox x:Name="HighBox" Header="High" Value="180" Minimum="120" Maximum="300" SpinButtonPlacementMode="Compact"
+                               ValueChanged="ThresholdChanged"/>
+                    <NumberBox x:Name="UrgentHighBox" Header="Urgent High" Value="250" Minimum="180" Maximum="400" SpinButtonPlacementMode="Compact"
+                               ValueChanged="ThresholdChanged"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="ResetThresholdsBtn" Content="Reset to Defaults" Click="ResetThresholds_Click"/>
+                    <TextBlock Text="Urgent: &lt;54 or &gt;250 (red flash), Warning: &lt;70 or &gt;180 (orange flash)"
+                               Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Status -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Status" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Name="StatusText" Text="Ready" Foreground="Green"/>
+            </StackPanel>
+
+            <!-- Activity Log -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Activity Log" FontWeight="SemiBold" FontSize="16"/>
+                <Border Background="#FF1a1a1a" CornerRadius="4" Padding="8" Height="150">
+                    <ScrollViewer>
+                        <TextBlock x:Name="LogText"
+                                   FontFamily="Consolas"
+                                   FontSize="11"
+                                   Foreground="Lime"
+                                   TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
+
+            <!-- Exit Button -->
+            <Button Content="Exit Application"
+                    HorizontalAlignment="Right"
+                    Click="Exit_Click"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</Window>

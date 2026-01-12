@@ -1,7 +1,26 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git:*)",
+      "Bash(dotnet:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(ssh:*)",
+      "Bash(ssh-add:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(powershell:*)",
+      "Bash(tasklist:*)",
+      "Bash(sleep:*)",
+      "WebSearch",
+      "WebFetch(domain:developer.1password.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.microsoft.com)",
+      "WebFetch(domain:learn.microsoft.com)"
     ],
     "deny": [],
     "ask": []

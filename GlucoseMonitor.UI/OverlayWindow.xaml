@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="GlucoseMonitor.UI.OverlayWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Glucose Overlay">
+
+    <Grid Background="#FF000000" Padding="8">
+        <Grid.ContextFlyout>
+            <MenuFlyout>
+                <MenuFlyoutItem x:Name="MenuShowSettings" Text="Settings" Click="MenuShowSettings_Click"/>
+                <MenuFlyoutItem x:Name="MenuRefresh" Text="Refresh Now" Click="MenuRefresh_Click"/>
+                <MenuFlyoutSeparator/>
+                <MenuFlyoutItem x:Name="MenuExit" Text="Exit" Click="MenuExit_Click"/>
+            </MenuFlyout>
+        </Grid.ContextFlyout>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header: Glucose value + Delta/Time -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Main glucose value with arrow -->
+            <TextBlock x:Name="GlucoseValueText"
+                       Grid.Column="0"
+                       Text="-- ?"
+                       FontFamily="Consolas"
+                       FontSize="48"
+                       FontWeight="Bold"
+                       Foreground="Yellow"
+                       VerticalAlignment="Center"/>
+
+            <!-- Delta and Time stack -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                <TextBlock x:Name="DeltaText"
+                           Text="+0.0 mg/dL"
+                           FontFamily="Consolas"
+                           FontSize="14"
+                           Foreground="#FFFF4444"
+                           Margin="0,0,0,4"/>
+                <TextBlock x:Name="TimeAgoText"
+                           Text="-- ago"
+                           FontFamily="Consolas"
+                           FontSize="14"
+                           Foreground="#FF00FF00"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- History Table: 3 rows x 5 columns -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Row 0: Values -->
+            <TextBlock x:Name="Val0" Grid.Row="0" Grid.Column="0" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Val1" Grid.Row="0" Grid.Column="1" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Val2" Grid.Row="0" Grid.Column="2" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Val3" Grid.Row="0" Grid.Column="3" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Val4" Grid.Row="0" Grid.Column="4" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+
+            <!-- Row 1: Changes -->
+            <TextBlock x:Name="Chg0" Grid.Row="1" Grid.Column="0" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Chg1" Grid.Row="1" Grid.Column="1" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Chg2" Grid.Row="1" Grid.Column="2" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Chg3" Grid.Row="1" Grid.Column="3" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Chg4" Grid.Row="1" Grid.Column="4" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+
+            <!-- Row 2: Times -->
+            <TextBlock x:Name="Time0" Grid.Row="2" Grid.Column="0" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Time1" Grid.Row="2" Grid.Column="1" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Time2" Grid.Row="2" Grid.Column="2" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Time3" Grid.Row="2" Grid.Column="3" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Time4" Grid.Row="2" Grid.Column="4" Text="" FontFamily="Consolas" FontSize="12" Foreground="LightGray" HorizontalAlignment="Center"/>
+        </Grid>
+    </Grid>
+</Window>
