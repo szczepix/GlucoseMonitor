@@ -12,14 +12,22 @@ A .NET 9 application for monitoring blood glucose levels using the Nightscout AP
 - **GlucoseMonitor.Tests**: xUnit tests
 - **GlucoseMonitor.Installer**: WiX v6 MSI installer
 
-## Current Status: WinUI 3 Migration
+## Features
 
-The UI has been migrated from WinForms to WinUI 3 (Windows App SDK 1.8). See `MIGRATION_PLAN.md` for details.
+- **Floating Overlay**: Always-on-top, draggable glucose display with history table
+- **Glucose Alerts**: Flashing visual alerts for out-of-range values (ADA 2024 guidelines)
+  - Red flash: Urgent low (<54) or urgent high (>250 mg/dL)
+  - Orange flash: Low (<70) or high (>180 mg/dL)
+  - User-adjustable thresholds with reset to defaults
+- **Sound Alarms**: System beeps for glucose alerts with cooldown
+- **System Tray**: Background operation with tray icon and context menu
+- **Window Opacity**: Adjustable overlay transparency (20-100%)
 
-**Key changes:**
-- XAML-based UI: `MainWindow.xaml`, `OverlayWindow.xaml`, `App.xaml`
-- Target Framework: `net9.0-windows10.0.26100.0` (Windows 11 24H2)
-- Minimum Platform: Windows 11 22H2 (10.0.22621.0)
+## Technology
+
+- **UI Framework**: WinUI 3 (Windows App SDK 1.8)
+- **Target Framework**: `net9.0-windows10.0.26100.0` (Windows 11 24H2)
+- **Minimum Platform**: Windows 11 22H2 (10.0.22621.0)
 
 ## Development Commands
 

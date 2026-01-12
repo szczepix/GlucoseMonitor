@@ -12,6 +12,12 @@
 *.dbproj text eol=crlf merge=union
 *.wixproj text eol=crlf
 
+# XAML files
+*.xaml text eol=crlf
+
+# Manifest files
+*.manifest text eol=crlf
+
 # Configuration files
 *.config text eol=crlf
 *.json text eol=crlf
