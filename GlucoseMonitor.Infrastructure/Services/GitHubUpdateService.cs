@@ -243,7 +243,11 @@ public class GitHubUpdateService : IUpdateService
                 UseShellExecute = true,
                 CreateNoWindow = true
             };
-            System.Diagnostics.Process.Start(startInfo);
+            var process = System.Diagnostics.Process.Start(startInfo);
+            if (process == null)
+            {
+                throw new InvalidOperationException("Failed to launch update script");
+            }
 
             // The application will exit after this
             progress.Report(UpdateProgress.ForStage(UpdateStage.Installing, "Restarting..."));

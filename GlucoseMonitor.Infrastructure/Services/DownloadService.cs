@@ -21,11 +21,18 @@ public class DownloadService : IDownloadService
     {
         _logger = logger;
 
-        var handler = new HttpClientHandler
+        var handler = new HttpClientHandler();
+
+        // Enforce TLS 1.2+, with fallback for platforms without TLS 1.3
+        try
         {
-            // Enforce TLS 1.2+
-            SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
-        };
+            handler.SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13;
+        }
+        catch (NotSupportedException)
+        {
+            handler.SslProtocols = SslProtocols.Tls12;
+            _logger.Warning("TLS 1.3 not supported, using TLS 1.2 only");
+        }
 
         _httpClient = new HttpClient(handler)
         {
