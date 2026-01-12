@@ -68,47 +68,53 @@ public partial class App : Application
 
     private void InitializeTrayIcon()
     {
-        // Create context menu
-        var contextMenu = new MenuFlyout();
-
-        var showOverlayItem = new MenuFlyoutItem { Text = "Show Overlay" };
-        showOverlayItem.Click += (s, e) => ShowOverlay();
-
-        var settingsItem = new MenuFlyoutItem { Text = "Settings" };
-        settingsItem.Click += (s, e) => ShowMainWindow();
-
-        var exitItem = new MenuFlyoutItem { Text = "Exit" };
-        exitItem.Click += (s, e) => ExitApplication();
-
-        contextMenu.Items.Add(showOverlayItem);
-        contextMenu.Items.Add(settingsItem);
-        contextMenu.Items.Add(new MenuFlyoutSeparator());
-        contextMenu.Items.Add(exitItem);
-
-        // Create tray icon with blood drop icon
-        _trayIcon = new TaskbarIcon
+        try
         {
-            ToolTipText = "Glucose Monitor",
-            ContextMenuMode = ContextMenuMode.SecondWindow
-        };
+            // Create context menu
+            var contextMenu = new MenuFlyout();
 
-        // Load blood drop icon from ICO file
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "blood_drop.ico");
-        if (File.Exists(iconPath))
-        {
-            var iconUri = new Uri(iconPath);
-            _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(iconUri);
+            var showOverlayItem = new MenuFlyoutItem { Text = "Show Overlay" };
+            showOverlayItem.Click += (s, e) => ShowOverlay();
+
+            var settingsItem = new MenuFlyoutItem { Text = "Settings" };
+            settingsItem.Click += (s, e) => ShowMainWindow();
+
+            var exitItem = new MenuFlyoutItem { Text = "Exit" };
+            exitItem.Click += (s, e) => ExitApplication();
+
+            contextMenu.Items.Add(showOverlayItem);
+            contextMenu.Items.Add(settingsItem);
+            contextMenu.Items.Add(new MenuFlyoutSeparator());
+            contextMenu.Items.Add(exitItem);
+
+            // Create tray icon with blood drop icon
+            _trayIcon = new TaskbarIcon
+            {
+                ToolTipText = "Glucose Monitor",
+                ContextMenuMode = ContextMenuMode.SecondWindow
+            };
+
+            // Load blood drop icon from ICO file
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "blood_drop.ico");
+            if (File.Exists(iconPath))
+            {
+                _trayIcon.Icon = new System.Drawing.Icon(iconPath);
+            }
+
+            _trayIcon.ContextFlyout = contextMenu;
+
+            // Handle left click to show overlay
+            _trayIcon.LeftClickCommand = new RelayCommand(() => ShowOverlay());
+
+            // Handle double click to show settings
+            _trayIcon.DoubleClickCommand = new RelayCommand(() => ShowMainWindow());
+
+            _trayIcon.ForceCreate();
         }
-
-        _trayIcon.ContextFlyout = contextMenu;
-
-        // Handle left click to show overlay
-        _trayIcon.LeftClickCommand = new RelayCommand(() => ShowOverlay());
-
-        // Handle double click to show settings
-        _trayIcon.DoubleClickCommand = new RelayCommand(() => ShowMainWindow());
-
-        _trayIcon.ForceCreate();
+        catch (Exception ex)
+        {
+            Logger?.LogError($"Failed to create tray icon: {ex.Message}");
+        }
     }
 
     public static void ShowMainWindow()

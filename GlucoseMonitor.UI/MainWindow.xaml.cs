@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
 
     private readonly DispatcherTimer _refreshTimer;
     private bool _isMonitoring = true;
+    private bool _isInitialized = false;
     private int _iterationCount = 0;
     private readonly Queue<GlucoseReading> _glucoseHistory = new();
     private readonly Dictionary<string, DateTime> _lastAlarmTimes = new();
@@ -87,6 +88,8 @@ public sealed partial class MainWindow : Window
         LowBox.Value = OverlayWindow.LowThreshold;
         HighBox.Value = OverlayWindow.HighThreshold;
         UrgentHighBox.Value = OverlayWindow.UrgentHighThreshold;
+
+        _isInitialized = true;
     }
 
     private void SaveState()
@@ -219,6 +222,9 @@ public sealed partial class MainWindow : Window
 
     private void ThresholdChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
+        // Skip during initialization
+        if (!_isInitialized) return;
+
         // Update OverlayWindow static thresholds
         if (!double.IsNaN(UrgentLowBox.Value))
             OverlayWindow.UrgentLowThreshold = UrgentLowBox.Value;
