@@ -1,0 +1,6 @@
+@GlucoseMonitor.MockServer_HostAddress = http://localhost:5009
+
+GET {{GlucoseMonitor.MockServer_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
