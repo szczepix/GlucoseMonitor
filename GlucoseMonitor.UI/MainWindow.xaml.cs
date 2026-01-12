@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Dispatching;
 using GlucoseMonitor.Core.Models;
 using GlucoseMonitor.Core.Interfaces;
 using GlucoseMonitor.UI.Services;
@@ -35,6 +36,7 @@ public sealed partial class MainWindow : Window
     private readonly TimeSpan _alarmCooldown = TimeSpan.FromMinutes(5);
     private AppWindow? _appWindow;
     private List<ServerProfile> _profiles = new();
+    private ReleaseInfo? _pendingUpdate;
 
     public MainWindow()
     {
@@ -54,6 +56,15 @@ public sealed partial class MainWindow : Window
         {
             _refreshTimer.Start();
             _ = RefreshGlucoseAsync();
+        }
+
+        // Subscribe to update notifications
+        App.UpdateService.UpdateAvailable += OnUpdateAvailable;
+
+        // Check for updates on startup (non-blocking)
+        if (App.UpdateService.Settings.ShouldCheckForUpdates)
+        {
+            _ = CheckForUpdatesAsync();
         }
 
         App.Logger?.LogInfo("Glucose Monitor started");
@@ -565,4 +576,80 @@ public sealed partial class MainWindow : Window
                 isError ? Microsoft.UI.Colors.Red : Microsoft.UI.Colors.Green);
         });
     }
+
+    #region Update Methods
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var includePreReleases = App.UpdateService.Settings.IncludePreReleases;
+            var update = await App.UpdateService.CheckForUpdateAsync(includePreReleases);
+
+            if (update != null)
+            {
+                ShowUpdateBanner(update);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to check for updates");
+        }
+    }
+
+    private void OnUpdateAvailable(object? sender, ReleaseInfo release)
+    {
+        DispatcherQueue.TryEnqueue(() => ShowUpdateBanner(release));
+    }
+
+    private void ShowUpdateBanner(ReleaseInfo release)
+    {
+        _pendingUpdate = release;
+        UpdateBannerText.Text = "A new version is available!";
+        UpdateVersionText.Text = $"{release.TagName} - {release.FormattedSize}";
+        UpdateBanner.Visibility = Visibility.Visible;
+        App.Logger?.LogInfo($"Update available: {release.TagName}");
+    }
+
+    private void UpdateNow_Click(object sender, RoutedEventArgs e)
+    {
+        App.ShowUpdateWindow();
+    }
+
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        CheckUpdatesBtn.IsEnabled = false;
+        CheckUpdatesBtn.Content = "Checking...";
+
+        try
+        {
+            var includePreReleases = App.UpdateService.Settings.IncludePreReleases;
+            var update = await App.UpdateService.CheckForUpdateAsync(includePreReleases);
+
+            if (update != null)
+            {
+                ShowUpdateBanner(update);
+            }
+            else
+            {
+                App.Logger?.LogInfo($"No updates available. Current: v{App.UpdateService.CurrentVersion}");
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Logger?.LogError($"Update check failed: {ex.Message}");
+        }
+        finally
+        {
+            CheckUpdatesBtn.IsEnabled = true;
+            CheckUpdatesBtn.Content = "Check for Updates";
+        }
+    }
+
+    private void VersionManager_Click(object sender, RoutedEventArgs e)
+    {
+        App.ShowUpdateWindow();
+    }
+
+    #endregion
 }
