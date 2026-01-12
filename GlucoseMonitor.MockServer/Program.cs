@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GlucoseMonitor.MockServer;
-using GlucoseMonitor.MockServer.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,10 +72,10 @@ app.MapGet("/api/v1/status", () =>
             units = "mg/dl",
             thresholds = new
             {
-                bgHigh = GlucoseThresholds.UrgentHigh,
-                bgTargetTop = GlucoseThresholds.TargetTop,
-                bgTargetBottom = GlucoseThresholds.TargetBottom,
-                bgLow = GlucoseThresholds.UrgentLow
+                bgHigh = 250,
+                bgTargetTop = 180,
+                bgTargetBottom = 70,
+                bgLow = 54
             }
         }
     });
@@ -513,7 +511,7 @@ public class MockGlucoseState
             entries.Add(new SgvEntry
             {
                 Id = Guid.NewGuid().ToString(),
-                Sgv = ((int)glucose).ToString(),
+                Sgv = (int)glucose,
                 Date = entryTime.ToUnixTimeMilliseconds(),
                 DateString = entryTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
                 Trend = GetTrendNumber(CurrentDirection),
@@ -523,7 +521,7 @@ public class MockGlucoseState
                 UtcOffset = 0,
                 SysTime = entryTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
                 Mills = entryTime.ToUnixTimeMilliseconds(),
-                BgDelta = i == 0 ? CurrentDelta.ToString() : null
+                BgDelta = i == 0 ? CurrentDelta : null
             });
         }
 
@@ -541,6 +539,87 @@ public class MockGlucoseState
         "DoubleDown" => 7,
         _ => 4
     };
+}
+
+public class SgvEntry
+{
+    [JsonPropertyName("_id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("sgv")]
+    public int Sgv { get; set; }
+
+    [JsonPropertyName("date")]
+    public long Date { get; set; }
+
+    [JsonPropertyName("dateString")]
+    public string? DateString { get; set; }
+
+    [JsonPropertyName("trend")]
+    public int Trend { get; set; }
+
+    [JsonPropertyName("direction")]
+    public string? Direction { get; set; }
+
+    [JsonPropertyName("device")]
+    public string? Device { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("utcOffset")]
+    public int UtcOffset { get; set; }
+
+    [JsonPropertyName("sysTime")]
+    public string? SysTime { get; set; }
+
+    [JsonPropertyName("mills")]
+    public long Mills { get; set; }
+
+    [JsonPropertyName("bgdelta")]
+    public double? BgDelta { get; set; }
+}
+
+public class PebbleResponse
+{
+    [JsonPropertyName("status")]
+    public List<StatusInfo>? Status { get; set; }
+
+    [JsonPropertyName("bgs")]
+    public List<PebbleBg>? Bgs { get; set; }
+}
+
+public class StatusInfo
+{
+    [JsonPropertyName("now")]
+    public long Now { get; set; }
+}
+
+public class PebbleBg
+{
+    [JsonPropertyName("sgv")]
+    public string? Sgv { get; set; }
+
+    [JsonPropertyName("trend")]
+    public int Trend { get; set; }
+
+    [JsonPropertyName("direction")]
+    public string? Direction { get; set; }
+
+    [JsonPropertyName("datetime")]
+    public long Datetime { get; set; }
+
+    [JsonPropertyName("bgdelta")]
+    public string? BgDelta { get; set; }
+
+    [JsonPropertyName("battery")]
+    public string? Battery { get; set; }
+
+    [JsonPropertyName("iob")]
+    public string? Iob { get; set; }
+
+    [JsonPropertyName("cob")]
+    public string? Cob { get; set; }
 }
 
 // Expose Program class for integration tests

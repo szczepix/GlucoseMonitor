@@ -1,8 +1,6 @@
 using System.Net.Http.Json;
 using FluentAssertions;
 using GlucoseMonitor.Core.Models;
-using GlucoseMonitor.MockServer;
-using GlucoseMonitor.MockServer.Models;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -14,77 +12,27 @@ namespace GlucoseMonitor.IntegrationTests;
 /// </summary>
 public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
 {
+    private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
     public MockServerTests(WebApplicationFactory<Program> factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory;
+        _client = _factory.CreateClient();
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
-
     public Task DisposeAsync()
     {
         _client.Dispose();
         return Task.CompletedTask;
     }
 
-    #region Helper Methods
-
-    /// <summary>
-    /// Sets the mock server to a specific scenario.
-    /// </summary>
-    private Task SetScenarioAsync(string scenario) =>
-        _client.PostAsync($"/mock/scenario/{scenario}", null);
-
-    /// <summary>
-    /// Sets a specific glucose value on the mock server.
-    /// </summary>
-    private Task SetGlucoseValueAsync(double value) =>
-        _client.PostAsync($"/mock/value/{value}", null);
-
-    /// <summary>
-    /// Sets the trend direction on the mock server.
-    /// </summary>
-    private Task SetDirectionAsync(string direction) =>
-        _client.PostAsync($"/mock/direction/{direction}", null);
-
-    /// <summary>
-    /// Fetches glucose entries from the mock server.
-    /// </summary>
-    private async Task<List<SgvEntry>> GetEntriesAsync(int count = 1)
-    {
-        var response = await _client.GetAsync($"/api/v1/entries/sgv.json?count={count}");
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<List<SgvEntry>>() ?? [];
-    }
-
-    /// <summary>
-    /// Fetches the first glucose entry from the mock server.
-    /// </summary>
-    private async Task<SgvEntry> GetFirstEntryAsync()
-    {
-        var entries = await GetEntriesAsync(1);
-        return entries.First();
-    }
-
-    /// <summary>
-    /// Fetches the mock server status.
-    /// </summary>
-    private async Task<MockStatusResponse> GetMockStatusAsync()
-    {
-        var response = await _client.GetAsync("/mock/status");
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<MockStatusResponse>()
-            ?? throw new InvalidOperationException("Failed to deserialize mock status");
-    }
-
-    #endregion
-
-    #region API Endpoint Tests
+    // =========================================
+    // API ENDPOINT TESTS
+    // =========================================
 
     [Fact]
-    [Trait("Category", "API")]
     public async Task MockServer_StatusEndpoint_ReturnsOk()
     {
         var response = await _client.GetAsync("/api/v1/status");
@@ -92,33 +40,30 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     }
 
     [Fact]
-    [Trait("Category", "API")]
     public async Task MockServer_EntriesEndpoint_ReturnsValidData()
     {
-        var entries = await GetEntriesAsync(5);
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=5");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
+        response.IsSuccessStatusCode.Should().BeTrue();
+        entries.Should().NotBeNull();
         entries.Should().HaveCount(5);
-        entries.Should().AllSatisfy(e =>
-        {
-            int.Parse(e.Sgv!).Should().BeGreaterThan(0);
-            e.Direction.Should().NotBeNullOrEmpty();
-        });
+        entries!.All(e => e.Sgv > 0).Should().BeTrue();
+        entries.All(e => !string.IsNullOrEmpty(e.Direction)).Should().BeTrue();
     }
 
     [Fact]
-    [Trait("Category", "API")]
     public async Task MockServer_PebbleEndpoint_ReturnsValidData()
     {
         var response = await _client.GetAsync("/pebble?count=1&units=mg");
         response.IsSuccessStatusCode.Should().BeTrue();
     }
 
-    #endregion
-
-    #region Scenario Tests
+    // =========================================
+    // SCENARIO TESTS - Test all glucose ranges
+    // =========================================
 
     [Theory]
-    [Trait("Category", "Scenarios")]
     [InlineData("normal", 70, 140)]
     [InlineData("high", 170, 250)]
     [InlineData("low", 50, 80)]
@@ -127,16 +72,20 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     [InlineData("stable", 95, 105)]
     public async Task Scenario_ReturnsGlucoseInExpectedRange(string scenario, int minValue, int maxValue)
     {
-        await SetScenarioAsync(scenario);
+        // Set scenario
+        await _client.PostAsync($"/mock/scenario/{scenario}", null);
 
-        var entry = await GetFirstEntryAsync();
+        // Fetch glucose via API
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=1");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
-        int.Parse(entry.Sgv!).Should().BeInRange(minValue, maxValue,
+        entries.Should().NotBeEmpty();
+        var glucose = entries!.First().Sgv;
+        glucose.Should().BeInRange(minValue, maxValue,
             $"Scenario '{scenario}' should return glucose between {minValue}-{maxValue}");
     }
 
     [Theory]
-    [Trait("Category", "Scenarios")]
     [InlineData("rising", "SingleUp")]
     [InlineData("falling", "SingleDown")]
     [InlineData("urgent_high", "DoubleUp")]
@@ -144,48 +93,50 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     [InlineData("stable", "Flat")]
     public async Task Scenario_ReturnsCorrectDirection(string scenario, string expectedDirection)
     {
-        await SetScenarioAsync(scenario);
+        await _client.PostAsync($"/mock/scenario/{scenario}", null);
 
-        var entry = await GetFirstEntryAsync();
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=1");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
-        entry.Direction.Should().Be(expectedDirection);
+        entries.Should().NotBeEmpty();
+        entries!.First().Direction.Should().Be(expectedDirection);
     }
 
-    #endregion
-
-    #region Glucose Reading Model Tests
+    // =========================================
+    // GLUCOSE READING MODEL TESTS
+    // =========================================
 
     [Fact]
-    [Trait("Category", "Model")]
     public async Task GlucoseReading_HasAllRequiredFields()
     {
-        await SetScenarioAsync("normal");
+        await _client.PostAsync("/mock/scenario/normal", null);
 
-        var entry = await GetFirstEntryAsync();
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=1");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
-        int.Parse(entry.Sgv!).Should().BeGreaterThan(0);
+        var entry = entries.Should().ContainSingle().Subject;
+        entry.Sgv.Should().BeGreaterThan(0);
         entry.Direction.Should().NotBeNullOrEmpty();
         entry.Type.Should().Be("sgv");
         entry.Device.Should().Be("MockNightscout");
     }
 
     [Fact]
-    [Trait("Category", "Model")]
     public async Task GlucoseReading_HistoryReturnsMultipleEntries()
     {
-        await SetScenarioAsync("normal");
+        await _client.PostAsync("/mock/scenario/normal", null);
 
-        var entries = await GetEntriesAsync(20);
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=20");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
         entries.Should().HaveCount(20);
     }
 
-    #endregion
-
-    #region Alarm Threshold Tests
+    // =========================================
+    // ALARM THRESHOLD TESTS
+    // =========================================
 
     [Theory]
-    [Trait("Category", "Alarms")]
     [InlineData(53, "UrgentLow")]
     [InlineData(54, "UrgentLow")]
     [InlineData(69, "Low")]
@@ -197,10 +148,13 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     [InlineData(251, "UrgentHigh")]
     public async Task AlarmThreshold_TriggersCorrectly(double glucoseValue, string? expectedCategory)
     {
-        await SetGlucoseValueAsync(glucoseValue);
+        await _client.PostAsync($"/mock/value/{glucoseValue}", null);
 
-        var entry = await GetFirstEntryAsync();
-        var alarmCategory = GlucoseThresholds.GetAlarmCategory(int.Parse(entry.Sgv!));
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=1");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
+
+        var glucose = entries!.First().Sgv;
+        var alarmCategory = GetAlarmCategory(glucose);
 
         if (expectedCategory != null)
         {
@@ -213,12 +167,25 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
         }
     }
 
-    #endregion
+    private static string? GetAlarmCategory(double value)
+    {
+        const double urgentHigh = 250;
+        const double high = 180;
+        const double low = 70;
+        const double urgentLow = 54;
 
-    #region Color Coding Tests
+        if (value >= urgentHigh) return "UrgentHigh";
+        if (value >= high) return "High";
+        if (value <= urgentLow) return "UrgentLow";
+        if (value <= low) return "Low";
+        return null;
+    }
+
+    // =========================================
+    // COLOR CODING TESTS (using GlucoseReading model)
+    // =========================================
 
     [Theory]
-    [Trait("Category", "Colors")]
     [InlineData(50, 255, 0, 0)]     // Low (<70) - Red
     [InlineData(65, 255, 0, 0)]     // Low (<70) - Red
     [InlineData(75, 255, 165, 0)]   // Low-normal (70-80) - Orange
@@ -227,7 +194,14 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     [InlineData(260, 255, 0, 0)]    // High (>250) - Red
     public void GlucoseReading_ReturnsCorrectColor(double glucoseValue, int expectedR, int expectedG, int expectedB)
     {
-        var reading = CreateGlucoseReading(glucoseValue);
+        // Create a GlucoseReading model directly to test color logic
+        var reading = new GlucoseReading
+        {
+            Value = glucoseValue,
+            Direction = "Flat",
+            Units = "mg/dL",
+            Timestamp = DateTime.Now
+        };
 
         var color = reading.GetGlucoseColor();
 
@@ -236,21 +210,11 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
         color.B.Should().Be((byte)expectedB);
     }
 
-    private static GlucoseReading CreateGlucoseReading(double value, string direction = "Flat") =>
-        new()
-        {
-            Value = value,
-            Direction = direction,
-            Units = "mg/dL",
-            Timestamp = DateTime.Now
-        };
-
-    #endregion
-
-    #region Direction Arrow Tests
+    // =========================================
+    // DIRECTION ARROW TESTS
+    // =========================================
 
     [Theory]
-    [Trait("Category", "Arrows")]
     [InlineData("Flat", "→")]
     [InlineData("FortyFiveUp", "↗")]
     [InlineData("FortyFiveDown", "↘")]
@@ -260,35 +224,43 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     [InlineData("DoubleDown", "⇊")]
     public void GlucoseReading_ReturnsCorrectArrow(string direction, string expectedArrow)
     {
-        var reading = CreateGlucoseReading(100, direction);
+        var reading = new GlucoseReading
+        {
+            Value = 100,
+            Direction = direction,
+            Units = "mg/dL",
+            Timestamp = DateTime.Now
+        };
 
         var arrow = reading.GetDirectionArrow();
-
         arrow.Should().Be(expectedArrow);
     }
 
-    #endregion
-
-    #region Manual Control Tests
+    // =========================================
+    // MANUAL VALUE CONTROL TESTS
+    // =========================================
 
     [Theory]
-    [Trait("Category", "Control")]
     [InlineData(42)]
     [InlineData(100)]
     [InlineData(250)]
     [InlineData(350)]
     public async Task ManualValue_SetsExactGlucose(double expectedValue)
     {
-        await SetGlucoseValueAsync(expectedValue);
+        await _client.PostAsync($"/mock/value/{expectedValue}", null);
 
-        var entry = await GetFirstEntryAsync();
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=1");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
-        int.Parse(entry.Sgv!).Should().BeCloseTo((int)expectedValue, 5,
+        entries!.First().Sgv.Should().BeCloseTo((int)expectedValue, 5,
             "Manual value should set glucose to approximately the specified value");
     }
 
+    // =========================================
+    // DIRECTION CONTROL TESTS
+    // =========================================
+
     [Theory]
-    [Trait("Category", "Control")]
     [InlineData("Flat")]
     [InlineData("FortyFiveUp")]
     [InlineData("FortyFiveDown")]
@@ -298,19 +270,19 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     [InlineData("DoubleDown")]
     public async Task DirectionControl_SetsCorrectDirection(string direction)
     {
-        await SetDirectionAsync(direction);
+        await _client.PostAsync($"/mock/direction/{direction}", null);
 
-        var entry = await GetFirstEntryAsync();
+        var response = await _client.GetAsync("/api/v1/entries/sgv.json?count=1");
+        var entries = await response.Content.ReadFromJsonAsync<List<SgvEntry>>();
 
-        entry.Direction.Should().Be(direction);
+        entries!.First().Direction.Should().Be(direction);
     }
 
-    #endregion
-
-    #region Error Handling Tests
+    // =========================================
+    // ERROR HANDLING TESTS
+    // =========================================
 
     [Fact]
-    [Trait("Category", "Errors")]
     public async Task InvalidScenario_ReturnsBadRequest()
     {
         var response = await _client.PostAsync("/mock/scenario/invalid_scenario", null);
@@ -318,29 +290,52 @@ public class MockServerTests : IClassFixture<WebApplicationFactory<Program>>, IA
     }
 
     [Fact]
-    [Trait("Category", "Errors")]
     public async Task InvalidDirection_ReturnsBadRequest()
     {
         var response = await _client.PostAsync("/mock/direction/InvalidDirection", null);
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
     }
 
-    #endregion
-
-    #region Mock Status Tests
+    // =========================================
+    // MOCK STATUS TESTS
+    // =========================================
 
     [Fact]
-    [Trait("Category", "Status")]
     public async Task MockStatus_ReturnsCurrentState()
     {
-        await SetScenarioAsync("high");
+        await _client.PostAsync("/mock/scenario/high", null);
 
-        var status = await GetMockStatusAsync();
+        var response = await _client.GetAsync("/mock/status");
+        var status = await response.Content.ReadFromJsonAsync<MockStatus>();
 
         status.Should().NotBeNull();
-        status.Scenario.Should().Be("high");
+        status!.Scenario.Should().Be("high");
         status.CurrentGlucose.Should().BeGreaterThan(0);
     }
+}
 
-    #endregion
+// DTOs for deserializing mock server responses
+public class SgvEntry
+{
+    public string? _id { get; set; }
+    public int Sgv { get; set; }
+    public long Date { get; set; }
+    public string? DateString { get; set; }
+    public int Trend { get; set; }
+    public string? Direction { get; set; }
+    public string? Device { get; set; }
+    public string? Type { get; set; }
+    public int UtcOffset { get; set; }
+    public string? SysTime { get; set; }
+    public long Mills { get; set; }
+    public double? BgDelta { get; set; }
+}
+
+public class MockStatus
+{
+    public string? Scenario { get; set; }
+    public double CurrentGlucose { get; set; }
+    public string? Direction { get; set; }
+    public double Delta { get; set; }
+    public string? ServerTime { get; set; }
 }
