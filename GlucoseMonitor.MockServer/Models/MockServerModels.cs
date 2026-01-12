@@ -5,6 +5,7 @@ namespace GlucoseMonitor.MockServer.Models;
 /// <summary>
 /// SGV (Sensor Glucose Value) entry from Nightscout API.
 /// Used by both MockServer and IntegrationTests.
+/// Note: sgv and bgdelta are strings to match real Nightscout API format.
 /// </summary>
 public class SgvEntry
 {
@@ -12,7 +13,7 @@ public class SgvEntry
     public string? Id { get; set; }
 
     [JsonPropertyName("sgv")]
-    public int Sgv { get; set; }
+    public string? Sgv { get; set; }
 
     [JsonPropertyName("date")]
     public long Date { get; set; }
@@ -42,7 +43,7 @@ public class SgvEntry
     public long Mills { get; set; }
 
     [JsonPropertyName("bgdelta")]
-    public double? BgDelta { get; set; }
+    public string? BgDelta { get; set; }
 }
 
 /// <summary>
