@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_ARCHIVE: GlucoseMonitor-win-x64.zip
+  MOCK_ARCHIVE: GlucoseMonitor.MockServer-win-x64.zip
+
 jobs:
   build:
     runs-on: windows-latest
@@ -34,11 +38,35 @@ jobs:
       - name: Run tests
         run: dotnet test --no-build -c Release
 
-      - name: Publish self-contained
-        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o ./publish
+      # Publish main application
+      - name: Publish GlucoseMonitor.UI (self-contained)
+        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o ./publish/app
 
-      - name: Create zip archive
-        run: Compress-Archive -Path ./publish/* -DestinationPath ./GlucoseMonitor-win-x64.zip
+      # Publish MockServer as standalone tool
+      - name: Publish GlucoseMonitor.MockServer (self-contained)
+        run: dotnet publish GlucoseMonitor.MockServer -c Release -r win-x64 --self-contained true -o ./publish/mockserver
+
+      # Create ZIP archives
+      - name: Create application archive
+        run: Compress-Archive -Path ./publish/app/* -DestinationPath ./${{ env.APP_ARCHIVE }}
+
+      - name: Create MockServer archive
+        run: Compress-Archive -Path ./publish/mockserver/* -DestinationPath ./${{ env.MOCK_ARCHIVE }}
+
+      # Generate checksums for security verification
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $appHash = (Get-FileHash -Path ./${{ env.APP_ARCHIVE }} -Algorithm SHA256).Hash.ToLower()
+          $mockHash = (Get-FileHash -Path ./${{ env.MOCK_ARCHIVE }} -Algorithm SHA256).Hash.ToLower()
+
+          @"
+          $appHash  ${{ env.APP_ARCHIVE }}
+          $mockHash  ${{ env.MOCK_ARCHIVE }}
+          "@ | Out-File -FilePath ./checksums.txt -Encoding utf8
+
+          Write-Host "Generated checksums:"
+          Get-Content ./checksums.txt
 
       - name: Generate version tag
         id: version
@@ -58,7 +86,10 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
-          files: ./GlucoseMonitor-win-x64.zip
+          files: |
+            ./${{ env.APP_ARCHIVE }}
+            ./${{ env.MOCK_ARCHIVE }}
+            ./checksums.txt
           generate_release_notes: true
           draft: false
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}

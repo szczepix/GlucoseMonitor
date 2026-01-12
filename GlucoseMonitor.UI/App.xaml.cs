@@ -14,6 +14,10 @@ namespace GlucoseMonitor.UI;
 
 public partial class App : Application
 {
+    // GitHub repository info for updates
+    private const string RepositoryOwner = "szczepix";
+    private const string RepositoryName = "GlucoseMonitor";
+
     public static ServiceContainer Services { get; private set; } = null!;
     public static IGlucoseDataService GlucoseService { get; private set; } = null!;
     public static IConfigurationService ConfigService { get; private set; } = null!;
@@ -21,6 +25,7 @@ public partial class App : Application
     public static IGlucoseHistoryService HistoryService { get; private set; } = null!;
     public static IProfileManager ProfileManager { get; private set; } = null!;
     public static ISecureStorageService SecureStorage { get; private set; } = null!;
+    public static IUpdateService UpdateService { get; private set; } = null!;
     public static GlucoseMonitor.Core.Interfaces.ILogger? Logger { get; set; }
 
     public static MainWindow? MainWindowInstance { get; set; }
@@ -100,6 +105,21 @@ public partial class App : Application
         GlucoseService = new NightscoutService();
         Services.RegisterSingleton<IGlucoseDataService>(GlucoseService);
 
+        // Initialize update services
+        var releaseCache = new ReleaseCacheService(Log.Logger);
+        Services.RegisterSingleton<IReleaseCache>(releaseCache);
+
+        var downloadService = new DownloadService(Log.Logger);
+        Services.RegisterSingleton<IDownloadService>(downloadService);
+
+        UpdateService = new GitHubUpdateService(
+            releaseCache,
+            downloadService,
+            Log.Logger,
+            RepositoryOwner,
+            RepositoryName);
+        Services.RegisterSingleton<IUpdateService>(UpdateService);
+
         // Migrate legacy config or load active profile
         InitializeProfile();
     }
@@ -170,11 +190,15 @@ public partial class App : Application
             var settingsItem = new MenuFlyoutItem { Text = "Settings" };
             settingsItem.Click += (s, e) => ShowMainWindow();
 
+            var updateItem = new MenuFlyoutItem { Text = "Check for Updates" };
+            updateItem.Click += (s, e) => ShowUpdateWindow();
+
             var exitItem = new MenuFlyoutItem { Text = "Exit" };
             exitItem.Click += (s, e) => ExitApplication();
 
             contextMenu.Items.Add(showOverlayItem);
             contextMenu.Items.Add(settingsItem);
+            contextMenu.Items.Add(updateItem);
             contextMenu.Items.Add(new MenuFlyoutSeparator());
             contextMenu.Items.Add(exitItem);
 
@@ -222,6 +246,12 @@ public partial class App : Application
         {
             OverlayWindowInstance.Activate();
         }
+    }
+
+    public static void ShowUpdateWindow()
+    {
+        var updateWindow = new UpdateWindow(UpdateService);
+        updateWindow.Activate();
     }
 
     public static void ExitApplication()
