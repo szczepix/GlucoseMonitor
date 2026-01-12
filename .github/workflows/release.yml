@@ -38,10 +38,10 @@ jobs:
       - name: Run tests
         run: dotnet test --no-build -c Release
 
-      # Publish main application (framework-dependent to avoid WinUI 3 self-contained issues)
-      # Requires .NET 9 runtime to be installed on target machine
-      - name: Publish GlucoseMonitor.UI (framework-dependent)
-        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained false -o ./publish/app
+      # Publish main application as self-contained single executable
+      # Bundles .NET 9 runtime and Windows App SDK - no installation required
+      - name: Publish GlucoseMonitor.UI (self-contained single file)
+        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o ./publish/app
 
       # Publish MockServer as standalone tool
       - name: Publish GlucoseMonitor.MockServer (self-contained)

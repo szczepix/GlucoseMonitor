@@ -83,10 +83,11 @@ dotnet test
 
 ## Dependencies
 
-- **.NET 9**: Latest .NET framework
-- **Windows Forms**: Modern UI framework
-- **Newtonsoft.Json**: JSON processing
-- **System.Drawing.Common**: Graphics support
+- **.NET 9**: Bundled with self-contained deployment
+- **Windows App SDK**: Bundled with application
+- **WinUI 3**: Modern UI framework
+- **H.NotifyIcon.WinUI**: System tray support
+- **Serilog**: Logging framework
 
 ## Configuration
 
@@ -112,36 +113,32 @@ Location: `GlucoseMonitor.Installer`
 Prerequisites:
 - .NET SDK 9.x (for building the app)
 - EITHER use the WiX v6 SDK-style project (no separate WiX install), OR use the WiX command-line .NET tool (see Option B below)
-- On target machines: .NET 9 Desktop Runtime x64 (framework-dependent install). Alternatively, publish self-contained if you prefer (see notes below).
+- On target machines: No runtime installation required (self-contained deployment)
 
 Option A — SDK-style project (WixToolset.Sdk v6):
 1. Close any running instance of GlucoseMonitor.UI to avoid file locks.
-2. Build or publish the UI app in Release. For framework-dependent:
-   - `dotnet build -c Release GlucoseMonitor.UI/GlucoseMonitor.UI.csproj`
-   For self-contained single-file:
-   - `dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true`
+2. Publish the UI app in Release as self-contained:
+   - `dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o GlucoseMonitor.UI/bin/Release/net9.0-windows10.0.26100.0/win-x64/publish`
 3. Build the installer (MSI):
-   - Framework-dependent harvest (default):
-     `dotnet build -c Release GlucoseMonitor.Installer/GlucoseMonitor.Installer.wixproj`
-   - Self-contained harvest from publish folder:
-     `dotnet build GlucoseMonitor.Installer/GlucoseMonitor.Installer.wixproj -c Release -p:HarvestDirectory="GlucoseMonitor.UI\\bin\\Release\\net9.0-windows\\win-x64\\publish"`
+   - `dotnet build -c Release GlucoseMonitor.Installer/GlucoseMonitor.Installer.wixproj`
 4. The MSI will be created under `GlucoseMonitor.Installer/bin/Release/`.
 
 Option B — WiX command-line .NET tool (per https://docs.firegiant.com/wix/using-wix/#command-line-net-tool):
 1. Install the tool (once): `dotnet tool install --global wix`
 2. Ensure your PATH includes `%USERPROFILE%\.dotnet\tools`.
-3. Build/publish the UI as in Option A step 2 (so the EXE exists to package).
+3. Publish the UI as in Option A step 2 (so the EXE exists to package).
 4. Build the MSI directly from Product.wxs, passing the harvest directory variable:
-   - `wix build .\GlucoseMonitor.Installer\Product.wxs -o .\GlucoseMonitor.Installer\bin\Release\GlucoseMonitor.Installer.msi -dHarvestDirectory=".\\GlucoseMonitor.UI\\bin\\Release\\net9.0-windows\\win-x64\\publish"`
+   - `wix build .\GlucoseMonitor.Installer\Product.wxs -o .\GlucoseMonitor.Installer\bin\Release\GlucoseMonitor.Installer.msi -dHarvestDirectory=".\\GlucoseMonitor.UI\\bin\\Release\\net9.0-windows10.0.26100.0\\win-x64\\publish"`
 
 Install:
 - Run the generated MSI on the target machine.
 - It installs to `C:\\Program Files\\GlucoseMonitor` and creates Start Menu and Desktop shortcuts named "Glucose Monitor".
+- **No .NET runtime installation required** - all dependencies are bundled in the app.
 
 Notes:
 - The WiX authoring uses the v4 schema (`xmlns="http://wixtoolset.org/schemas/v4/wxs"`), which is correct for WiX v6.
-- The installer harvests files from `GlucoseMonitor.UI/bin/<Configuration>/net9.0-windows` by default; override with `-p:HarvestDirectory=...` (Option A) or `-dHarvestDirectory=...` (Option B).
-- For self-contained installs, use the publish folder as the harvest directory.
+- The installer harvests files from the publish directory containing the self-contained application.
+- The published app includes .NET 9 runtime and Windows App SDK, making it a true standalone executable.
 
 ## Future Enhancements
 

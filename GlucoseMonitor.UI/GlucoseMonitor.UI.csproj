@@ -11,10 +11,14 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Platforms>x64;x86;ARM64</Platforms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Framework-dependent deployment: requires .NET 9 installed -->
-    <!-- Note: Self-contained WinUI 3 causes crashes, using FDD for reliability -->
-    <SelfContained>false</SelfContained>
-    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <!-- Self-contained deployment: bundles .NET runtime and Windows App SDK -->
+    <!-- PublishSingleFile creates a single executable with all dependencies -->
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>

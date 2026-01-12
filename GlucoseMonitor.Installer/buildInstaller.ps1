@@ -16,8 +16,9 @@
   Target runtime identifier for publish (Default: win-x64)
 
 .PARAMETER SelfContained
-  Publish as self-contained (Default: $true). When $false, the installer will
-  package a framework-dependent build from the bin folder.
+  Publish as self-contained (Default: $true). Creates a single executable with all
+  dependencies bundled. When $false, creates a framework-dependent build requiring
+  .NET 9 runtime to be installed.
 
 .PARAMETER OpenMsi
   Open the resulting MSI after build (Default: $false)
@@ -55,10 +56,10 @@ $installerProj = Join-Path $solutionRoot "GlucoseMonitor.Installer\GlucoseMonito
 
 # Publish directory depends on self-contained vs framework-dependent
 if ($SelfContained) {
-  $publishDir = Join-Path $uiProject "bin\$Configuration\net9.0-windows\$Runtime\publish"
+  $publishDir = Join-Path $uiProject "bin\$Configuration\net9.0-windows10.0.26100.0\$Runtime\publish"
 } else {
   # framework-dependent: harvest from build output
-  $publishDir = Join-Path $uiProject "bin\$Configuration\net9.0-windows"
+  $publishDir = Join-Path $uiProject "bin\$Configuration\net9.0-windows10.0.26100.0"
 }
 
 Write-Info "Solution root: $solutionRoot"
@@ -78,8 +79,9 @@ Write-Info "dotnet restore"
 
 # Step 3: Build/Publish UI
 if ($SelfContained) {
-  Write-Info "Publishing UI as self-contained single-file ($Configuration, $Runtime)"
-  & dotnet publish $uiProject -c $Configuration -r $Runtime --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true
+  Write-Info "Publishing UI as self-contained ($Configuration, $Runtime)"
+  Write-Info "This creates a single executable with all .NET and Windows App SDK dependencies"
+  & dotnet publish $uiProject -c $Configuration -r $Runtime --self-contained true -o $publishDir
 } else {
   Write-Info "Building UI as framework-dependent ($Configuration)"
   & dotnet build (Join-Path $uiProject "GlucoseMonitor.UI.csproj") -c $Configuration
