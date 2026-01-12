@@ -81,28 +81,20 @@ public sealed partial class MainWindow : Window
             FetchCountBox.Value = rfc;
         if (state.TryGetValue("EnableSound", out var esStr) && bool.TryParse(esStr, out var es))
             EnableAlarmsCheck.IsChecked = es;
-        if (state.TryGetValue("UrgentHigh", out var uhStr) && double.TryParse(uhStr, out var uh))
-            UrgentHighBox.Value = uh;
-        if (state.TryGetValue("High", out var hStr) && double.TryParse(hStr, out var h))
-            HighBox.Value = h;
-        if (state.TryGetValue("Low", out var lStr) && double.TryParse(lStr, out var l))
-            LowBox.Value = l;
-        if (state.TryGetValue("UrgentLow", out var ulStr) && double.TryParse(ulStr, out var ul))
-            UrgentLowBox.Value = ul;
+
+        // Load overlay thresholds (using OverlayWindow's static values which are already loaded)
+        UrgentLowBox.Value = OverlayWindow.UrgentLowThreshold;
+        LowBox.Value = OverlayWindow.LowThreshold;
+        HighBox.Value = OverlayWindow.HighThreshold;
+        UrgentHighBox.Value = OverlayWindow.UrgentHighThreshold;
     }
 
     private void SaveState()
     {
-        var state = new Dictionary<string, string>
-        {
-            ["Opacity"] = (OpacitySlider.Value / 100.0).ToString(),
-            ["RecentFetchCount"] = FetchCountBox.Value.ToString(),
-            ["EnableSound"] = (EnableAlarmsCheck.IsChecked ?? true).ToString(),
-            ["UrgentHigh"] = UrgentHighBox.Value.ToString(),
-            ["High"] = HighBox.Value.ToString(),
-            ["Low"] = LowBox.Value.ToString(),
-            ["UrgentLow"] = UrgentLowBox.Value.ToString()
-        };
+        var state = App.StateManager.LoadCustomState();
+        state["Opacity"] = (OpacitySlider.Value / 100.0).ToString();
+        state["RecentFetchCount"] = FetchCountBox.Value.ToString();
+        state["EnableSound"] = (EnableAlarmsCheck.IsChecked ?? true).ToString();
         App.StateManager.SaveState(state);
     }
 
@@ -223,6 +215,36 @@ public sealed partial class MainWindow : Window
             double opacity = OpacitySlider.Value / 100.0;
             App.OverlayWindowInstance?.UpdateOpacity(opacity);
         }
+    }
+
+    private void ThresholdChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        // Update OverlayWindow static thresholds
+        if (!double.IsNaN(UrgentLowBox.Value))
+            OverlayWindow.UrgentLowThreshold = UrgentLowBox.Value;
+        if (!double.IsNaN(LowBox.Value))
+            OverlayWindow.LowThreshold = LowBox.Value;
+        if (!double.IsNaN(HighBox.Value))
+            OverlayWindow.HighThreshold = HighBox.Value;
+        if (!double.IsNaN(UrgentHighBox.Value))
+            OverlayWindow.UrgentHighThreshold = UrgentHighBox.Value;
+
+        // Save to persistent state
+        OverlayWindow.SaveThresholds();
+    }
+
+    private void ResetThresholds_Click(object sender, RoutedEventArgs e)
+    {
+        // Reset to ADA 2024 recommended defaults
+        OverlayWindow.ResetThresholdsToDefaults();
+
+        // Update UI
+        UrgentLowBox.Value = OverlayWindow.UrgentLowThreshold;
+        LowBox.Value = OverlayWindow.LowThreshold;
+        HighBox.Value = OverlayWindow.HighThreshold;
+        UrgentHighBox.Value = OverlayWindow.UrgentHighThreshold;
+
+        App.Logger?.LogInfo("Thresholds reset to defaults (ADA 2024)");
     }
 
     private void ClearLog_Click(object sender, RoutedEventArgs e)

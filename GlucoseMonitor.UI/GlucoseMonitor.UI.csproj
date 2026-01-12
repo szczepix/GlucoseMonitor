@@ -25,4 +25,10 @@
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Assets\blood_drop.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

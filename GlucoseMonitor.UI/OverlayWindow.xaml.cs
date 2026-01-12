@@ -22,9 +22,37 @@ public sealed partial class OverlayWindow : Window
     [DllImport("user32.dll")]
     private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
 
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X; public int Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MARGINS { public int Left, Right, Top, Bottom; }
+
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_LAYERED = 0x80000;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_NOACTIVATE = 0x08000000;
     private const uint LWA_ALPHA = 0x2;
+
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    private const int DWMWCP_DONOTROUND = 1;
+
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOACTIVATE = 0x0010;
 
     private DispatcherTimer _refreshTimer = null!;
     private readonly TextBlock[] _valCells;
@@ -33,9 +61,20 @@ public sealed partial class OverlayWindow : Window
     private AppWindow? _appWindow;
     private IntPtr _hwnd;
     private bool _isDragging;
-    private PointInt32 _dragStartPosition;
+    private POINT _dragStartCursor;
     private PointInt32 _windowStartPosition;
     private double _opacity = 0.8;
+    private DispatcherTimer? _topmostTimer;
+    private DispatcherTimer? _flashTimer;
+    private bool _flashState = false;
+    private string _currentAlertLevel = "Normal";
+    private double _lastGlucoseValue = 0;
+
+    // Default glucose ranges (mg/dL) - Type 1 Diabetes recommended
+    public static double UrgentLowThreshold = 54;    // Level 2 hypoglycemia
+    public static double LowThreshold = 70;          // Level 1 hypoglycemia
+    public static double HighThreshold = 180;        // Above target range
+    public static double UrgentHighThreshold = 250;  // Significantly high
 
     public OverlayWindow()
     {
@@ -49,7 +88,9 @@ public sealed partial class OverlayWindow : Window
         SetupWindow();
         SetupDragging();
         SetupTimer();
+        SetupFlashTimer();
         LoadPosition();
+        LoadThresholds();
 
         // Initial fetch
         _ = RefreshGlucoseAsync();
@@ -63,9 +104,6 @@ public sealed partial class OverlayWindow : Window
 
         if (_appWindow != null)
         {
-            // Set window size
-            _appWindow.Resize(new SizeInt32(320, 180));
-
             // Remove title bar for overlay look
             if (_appWindow.Presenter is OverlappedPresenter presenter)
             {
@@ -79,6 +117,14 @@ public sealed partial class OverlayWindow : Window
             Title = "Glucose Overlay";
         }
 
+        // Remove rounded corners on Windows 11
+        int cornerPref = DWMWCP_DONOTROUND;
+        DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPref, sizeof(int));
+
+        // Extend frame into client area to remove border
+        var margins = new MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+        DwmExtendFrameIntoClientArea(_hwnd, ref margins);
+
         // Set opacity from state
         var state = App.StateManager.LoadCustomState();
         if (state.TryGetValue("Opacity", out var opacityStr) && double.TryParse(opacityStr, out var opacity))
@@ -86,15 +132,58 @@ public sealed partial class OverlayWindow : Window
             _opacity = opacity;
         }
         SetWindowOpacity(_opacity);
+
+        // Force always-on-top using Win32 API
+        EnforceTopmost();
+
+        // Start timer to keep window on top (every 500ms)
+        _topmostTimer = new DispatcherTimer();
+        _topmostTimer.Interval = TimeSpan.FromMilliseconds(500);
+        _topmostTimer.Tick += (s, e) => EnforceTopmost();
+        _topmostTimer.Start();
+
+        // Auto-size window to content after a short delay
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ResizeToContent();
+        });
+    }
+
+    private void EnforceTopmost()
+    {
+        SetWindowPos(_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    private void ResizeToContent()
+    {
+        if (_appWindow == null) return;
+
+        // Get the root grid and measure its desired size
+        var rootGrid = Content as Microsoft.UI.Xaml.Controls.Grid;
+        if (rootGrid != null)
+        {
+            rootGrid.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            var desiredSize = rootGrid.DesiredSize;
+
+            // Add small padding and resize
+            int width = (int)desiredSize.Width + 4;
+            int height = (int)desiredSize.Height + 4;
+
+            // Minimum size
+            width = Math.Max(width, 200);
+            height = Math.Max(height, 80);
+
+            _appWindow.Resize(new SizeInt32(width, height));
+        }
     }
 
     private void SetWindowOpacity(double opacity)
     {
         _opacity = Math.Clamp(opacity, 0.1, 1.0);
 
-        // Set layered window style
+        // Set extended window styles: layered + toolwindow (removes from taskbar)
         int exStyle = GetWindowLong(_hwnd, GWL_EXSTYLE);
-        SetWindowLong(_hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+        SetWindowLong(_hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TOOLWINDOW);
 
         // Set opacity (0-255)
         byte alpha = (byte)(_opacity * 255);
@@ -121,10 +210,10 @@ public sealed partial class OverlayWindow : Window
     {
         if (_appWindow == null) return;
 
-        _isDragging = true;
-        var point = e.GetCurrentPoint(Content as UIElement);
-        _dragStartPosition = new PointInt32((int)point.Position.X, (int)point.Position.Y);
+        // Use screen coordinates for smooth dragging
+        GetCursorPos(out _dragStartCursor);
         _windowStartPosition = _appWindow.Position;
+        _isDragging = true;
         ((UIElement)sender).CapturePointer(e.Pointer);
     }
 
@@ -132,9 +221,10 @@ public sealed partial class OverlayWindow : Window
     {
         if (!_isDragging || _appWindow == null) return;
 
-        var point = e.GetCurrentPoint(Content as UIElement);
-        var deltaX = (int)point.Position.X - _dragStartPosition.X;
-        var deltaY = (int)point.Position.Y - _dragStartPosition.Y;
+        // Get current screen cursor position
+        GetCursorPos(out POINT currentCursor);
+        var deltaX = currentCursor.X - _dragStartCursor.X;
+        var deltaY = currentCursor.Y - _dragStartCursor.Y;
 
         _appWindow.Move(new PointInt32(
             _windowStartPosition.X + deltaX,
@@ -148,6 +238,81 @@ public sealed partial class OverlayWindow : Window
             _isDragging = false;
             ((UIElement)sender).ReleasePointerCapture(e.Pointer);
             SavePosition();
+        }
+    }
+
+    private void SetupFlashTimer()
+    {
+        _flashTimer = new DispatcherTimer();
+        _flashTimer.Interval = TimeSpan.FromMilliseconds(500);
+        _flashTimer.Tick += (s, e) =>
+        {
+            if (_currentAlertLevel == "Normal")
+            {
+                // No flashing needed
+                SetBackgroundColor(Microsoft.UI.Colors.Black);
+                _flashTimer?.Stop();
+                return;
+            }
+
+            _flashState = !_flashState;
+
+            if (_flashState)
+            {
+                // Flash color based on alert level
+                var color = _currentAlertLevel switch
+                {
+                    "UrgentLow" or "UrgentHigh" => Microsoft.UI.Colors.DarkRed,
+                    "Low" or "High" => Windows.UI.Color.FromArgb(255, 200, 100, 0), // Orange
+                    _ => Microsoft.UI.Colors.Black
+                };
+                SetBackgroundColor(color);
+            }
+            else
+            {
+                SetBackgroundColor(Microsoft.UI.Colors.Black);
+            }
+        };
+    }
+
+    private void SetBackgroundColor(Windows.UI.Color color)
+    {
+        var rootGrid = Content as Microsoft.UI.Xaml.Controls.Grid;
+        if (rootGrid != null)
+        {
+            rootGrid.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(color);
+        }
+    }
+
+    private void UpdateAlertLevel(double glucoseValue)
+    {
+        _lastGlucoseValue = glucoseValue;
+        string newLevel;
+
+        if (glucoseValue <= UrgentLowThreshold)
+            newLevel = "UrgentLow";
+        else if (glucoseValue <= LowThreshold)
+            newLevel = "Low";
+        else if (glucoseValue >= UrgentHighThreshold)
+            newLevel = "UrgentHigh";
+        else if (glucoseValue >= HighThreshold)
+            newLevel = "High";
+        else
+            newLevel = "Normal";
+
+        if (newLevel != _currentAlertLevel)
+        {
+            _currentAlertLevel = newLevel;
+
+            if (newLevel == "Normal")
+            {
+                _flashTimer?.Stop();
+                SetBackgroundColor(Microsoft.UI.Colors.Black);
+            }
+            else
+            {
+                _flashTimer?.Start();
+            }
         }
     }
 
@@ -200,6 +365,9 @@ public sealed partial class OverlayWindow : Window
                 : age.TotalMinutes < 60
                     ? $"{(int)age.TotalMinutes} min ago"
                     : $"{(int)age.TotalHours}h ago";
+
+            // Update alert level for flashing
+            UpdateAlertLevel(reading.Value);
         });
     }
 
@@ -301,5 +469,61 @@ public sealed partial class OverlayWindow : Window
             });
         }
         catch { }
+    }
+
+    // Context menu handlers
+    private void MenuShowSettings_Click(object sender, RoutedEventArgs e)
+    {
+        App.ShowMainWindow();
+    }
+
+    private async void MenuRefresh_Click(object sender, RoutedEventArgs e)
+    {
+        await RefreshGlucoseAsync();
+    }
+
+    private void MenuExit_Click(object sender, RoutedEventArgs e)
+    {
+        App.ExitApplication();
+    }
+
+    private void LoadThresholds()
+    {
+        try
+        {
+            var state = App.StateManager.LoadCustomState();
+            if (state.TryGetValue("UrgentLowThreshold", out var urgentLow) && double.TryParse(urgentLow, out var ul))
+                UrgentLowThreshold = ul;
+            if (state.TryGetValue("LowThreshold", out var low) && double.TryParse(low, out var l))
+                LowThreshold = l;
+            if (state.TryGetValue("HighThreshold", out var high) && double.TryParse(high, out var h))
+                HighThreshold = h;
+            if (state.TryGetValue("UrgentHighThreshold", out var urgentHigh) && double.TryParse(urgentHigh, out var uh))
+                UrgentHighThreshold = uh;
+        }
+        catch { }
+    }
+
+    public static void SaveThresholds()
+    {
+        try
+        {
+            var state = App.StateManager.LoadCustomState();
+            state["UrgentLowThreshold"] = UrgentLowThreshold.ToString();
+            state["LowThreshold"] = LowThreshold.ToString();
+            state["HighThreshold"] = HighThreshold.ToString();
+            state["UrgentHighThreshold"] = UrgentHighThreshold.ToString();
+            App.StateManager.SaveState(state);
+        }
+        catch { }
+    }
+
+    public static void ResetThresholdsToDefaults()
+    {
+        UrgentLowThreshold = 54;    // Level 2 hypoglycemia
+        LowThreshold = 70;          // Level 1 hypoglycemia
+        HighThreshold = 180;        // Above target range
+        UrgentHighThreshold = 250;  // Significantly high
+        SaveThresholds();
     }
 }

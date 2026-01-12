@@ -6,6 +6,14 @@
     Title="Glucose Overlay">
 
     <Grid Background="#FF000000" Padding="8">
+        <Grid.ContextFlyout>
+            <MenuFlyout>
+                <MenuFlyoutItem x:Name="MenuShowSettings" Text="Settings" Click="MenuShowSettings_Click"/>
+                <MenuFlyoutItem x:Name="MenuRefresh" Text="Refresh Now" Click="MenuRefresh_Click"/>
+                <MenuFlyoutSeparator/>
+                <MenuFlyoutItem x:Name="MenuExit" Text="Exit" Click="MenuExit_Click"/>
+            </MenuFlyout>
+        </Grid.ContextFlyout>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>

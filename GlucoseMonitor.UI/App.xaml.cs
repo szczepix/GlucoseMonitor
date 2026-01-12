@@ -85,12 +85,21 @@ public partial class App : Application
         contextMenu.Items.Add(new MenuFlyoutSeparator());
         contextMenu.Items.Add(exitItem);
 
-        // Create tray icon
+        // Create tray icon with blood drop icon
         _trayIcon = new TaskbarIcon
         {
             ToolTipText = "Glucose Monitor",
             ContextMenuMode = ContextMenuMode.SecondWindow
         };
+
+        // Load blood drop icon from ICO file
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "blood_drop.ico");
+        if (File.Exists(iconPath))
+        {
+            var iconUri = new Uri(iconPath);
+            _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(iconUri);
+        }
+
         _trayIcon.ContextFlyout = contextMenu;
 
         // Handle left click to show overlay
