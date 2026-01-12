@@ -1,0 +1,35 @@
+@GlucoseMonitor.MockServer_HostAddress = http://localhost:5555
+
+### Get server status
+GET {{GlucoseMonitor.MockServer_HostAddress}}/api/v1/status
+Accept: application/json
+
+###
+
+### Get glucose entries
+GET {{GlucoseMonitor.MockServer_HostAddress}}/api/v1/entries/sgv.json?count=5
+Accept: application/json
+
+###
+
+### List available scenarios
+GET {{GlucoseMonitor.MockServer_HostAddress}}/mock/scenarios
+Accept: application/json
+
+###
+
+### Set scenario to normal
+POST {{GlucoseMonitor.MockServer_HostAddress}}/mock/scenario/normal
+
+###
+
+### Set specific glucose value
+POST {{GlucoseMonitor.MockServer_HostAddress}}/mock/value/120
+
+###
+
+### Get mock status
+GET {{GlucoseMonitor.MockServer_HostAddress}}/mock/status
+Accept: application/json
+
+###

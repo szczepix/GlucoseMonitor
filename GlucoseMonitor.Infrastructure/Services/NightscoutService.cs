@@ -3,6 +3,7 @@ using System.Text;
 using Newtonsoft.Json;
 using GlucoseMonitor.Core.Interfaces;
 using GlucoseMonitor.Core.Models;
+using Serilog;
 
 namespace GlucoseMonitor.Infrastructure.Services;
 
@@ -34,7 +35,8 @@ public class NightscoutService : IGlucoseDataService
 
             // Try legacy pebble endpoint first (some Nightscout setups still expose it)
             var pebbleUrl = BuildApiUrl();
-            LogMessage?.Invoke(this, $"Fetching data from: {pebbleUrl.Replace(AccessToken ?? "", "***")} (pebble)");
+            var displayPebbleUrl = string.IsNullOrEmpty(AccessToken) ? pebbleUrl : pebbleUrl.Replace(AccessToken, "***");
+            LogMessage?.Invoke(this, $"Fetching data from: {displayPebbleUrl} (pebble)");
 
             GlucoseReading? reading = null;
             try
@@ -64,7 +66,8 @@ public class NightscoutService : IGlucoseDataService
             {
                 // Fallback to the standard entries API used by most Nightscout instances
                 var entriesUrl = BuildEntriesApiUrl();
-                LogMessage?.Invoke(this, $"Fetching data from: {entriesUrl.Replace(AccessToken ?? "", "***")} (entries)");
+                var displayEntriesUrl = string.IsNullOrEmpty(AccessToken) ? entriesUrl : entriesUrl.Replace(AccessToken, "***");
+                LogMessage?.Invoke(this, $"Fetching data from: {displayEntriesUrl} (entries)");
                 var entriesResponse = await _httpClient.GetStringAsync(entriesUrl);
                 LogMessage?.Invoke(this, $"Received {entriesResponse.Length} characters of data from entries endpoint");
 
@@ -122,6 +125,7 @@ public class NightscoutService : IGlucoseDataService
         {
             if (string.IsNullOrWhiteSpace(NightscoutUrl))
             {
+                Log.Warning("NightscoutUrl is empty or null");
                 throw new InvalidOperationException("Nightscout URL is not configured");
             }
 
@@ -133,15 +137,23 @@ public class NightscoutService : IGlucoseDataService
                 url.Append($"&token={AccessToken}");
             }
 
-            var displayUrl = url.ToString().Replace(AccessToken ?? "", "***");
+            var displayUrl = string.IsNullOrEmpty(AccessToken)
+                ? url.ToString()
+                : url.ToString().Replace(AccessToken, "***");
+            Log.Debug("Fetching from URL: {Url}", displayUrl);
             LogMessage?.Invoke(this, $"Fetching recent data from: {displayUrl}");
 
             var response = await _httpClient.GetStringAsync(url.ToString());
+            Log.Debug("Response length: {Length} chars", response.Length);
+            Log.Debug("Response preview: {Preview}", response.AsSpan(0, Math.Min(200, response.Length)).ToString());
             LogMessage?.Invoke(this, $"Received {response.Length} characters for recent entries");
 
             var entries = JsonConvert.DeserializeObject<List<BloodGlucose>>(response) ?? new List<BloodGlucose>();
+            Log.Debug("Deserialized {Count} entries", entries.Count);
+
             if (entries.Count == 0)
             {
+                Log.Warning("No entries after deserialization");
                 return result;
             }
 
@@ -150,10 +162,12 @@ public class NightscoutService : IGlucoseDataService
             {
                 result.Add(ParseGlucoseReading(bg));
             }
+            Log.Debug("Parsed {Count} glucose readings", result.Count);
         }
         catch (Exception ex)
         {
             var error = $"Failed to fetch recent glucose: {ex.Message}";
+            Log.Error(ex, "Failed to fetch glucose data");
             LogMessage?.Invoke(this, error);
             ErrorOccurred?.Invoke(this, error);
         }

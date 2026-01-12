@@ -19,6 +19,24 @@
                            HorizontalAlignment="Center"/>
             </Border>
 
+            <!-- Server Profile Selection -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Server Profile" FontWeight="SemiBold" FontSize="16"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox x:Name="ProfileSelector"
+                              Width="280"
+                              PlaceholderText="Select a server profile"
+                              SelectionChanged="ProfileSelector_Changed"/>
+                    <Button x:Name="AddProfileBtn" Content="+" Width="36" Click="AddProfile_Click" ToolTipService.ToolTip="Add new profile"/>
+                    <Button x:Name="DeleteProfileBtn" Content="-" Width="36" Click="DeleteProfile_Click" ToolTipService.ToolTip="Delete current profile"/>
+                </StackPanel>
+
+                <TextBox x:Name="ProfileNameBox"
+                         Header="Profile Name"
+                         PlaceholderText="My Nightscout"/>
+            </StackPanel>
+
             <!-- Nightscout Configuration -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Nightscout Configuration" FontWeight="SemiBold" FontSize="16"/>
@@ -28,12 +46,12 @@
                          PlaceholderText="https://your-site.herokuapp.com"/>
 
                 <PasswordBox x:Name="AccessTokenBox"
-                             Header="Access Token"
+                             Header="Access Token (encrypted at rest)"
                              PlaceholderText="Your API token"/>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button x:Name="TestConnectionBtn" Content="Test Connection" Click="TestConnection_Click"/>
-                    <Button x:Name="SaveConfigBtn" Content="Save Config" Style="{StaticResource AccentButtonStyle}" Click="SaveConfig_Click"/>
+                    <Button x:Name="SaveConfigBtn" Content="Save Profile" Style="{StaticResource AccentButtonStyle}" Click="SaveConfig_Click"/>
                 </StackPanel>
             </StackPanel>
 
