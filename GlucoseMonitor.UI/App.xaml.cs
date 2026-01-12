@@ -6,6 +6,8 @@ using GlucoseMonitor.Infrastructure.DependencyInjection;
 using GlucoseMonitor.UI.Services;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
+using Serilog;
+using Serilog.Events;
 
 namespace GlucoseMonitor.UI;
 
@@ -16,7 +18,7 @@ public partial class App : Application
     public static IConfigurationService ConfigService { get; private set; } = null!;
     public static IStateManager StateManager { get; private set; } = null!;
     public static IGlucoseHistoryService HistoryService { get; private set; } = null!;
-    public static ILogger? Logger { get; set; }
+    public static GlucoseMonitor.Core.Interfaces.ILogger? Logger { get; set; }
 
     public static MainWindow? MainWindowInstance { get; set; }
     public static OverlayWindow? OverlayWindowInstance { get; set; }
@@ -26,11 +28,51 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        InitializeSerilog();
         InitializeServices();
+    }
+
+    private void InitializeSerilog()
+    {
+        // Create logs folder in AppData
+        var logFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "GlucoseMonitor",
+            "Logs");
+        Directory.CreateDirectory(logFolder);
+
+        // Configure Serilog with rolling file logs
+        var logPath = Path.Combine(logFolder, "GlucoseMonitor-.log");
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .Enrich.WithThreadId()
+            .Enrich.WithEnvironmentName()
+            .Enrich.FromLogContext()
+            .WriteTo.File(
+                logPath,
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 30,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{ThreadId}] {Message:lj}{NewLine}{Exception}",
+                shared: true)
+            .CreateLogger();
+
+        Log.Information("=== Glucose Monitor Starting ===");
+        Log.Information("Application version: {Version}", GetType().Assembly.GetName().Version);
+        Log.Information("Log folder: {LogFolder}", logFolder);
+
+        // Handle unhandled exceptions
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception");
+            Log.CloseAndFlush();
+        };
     }
 
     private void InitializeServices()
     {
+        Log.Debug("Initializing services...");
         Services = new ServiceContainer();
 
         ConfigService = new ConfigurationService();
@@ -135,6 +177,8 @@ public partial class App : Application
 
     public static void ExitApplication()
     {
+        Log.Information("=== Glucose Monitor Shutting Down ===");
+
         // Dispose tray icon
         if (Current is App app && app._trayIcon != null)
         {
@@ -143,6 +187,9 @@ public partial class App : Application
 
         OverlayWindowInstance?.Close();
         MainWindowInstance?.Close();
+
+        // Flush and close Serilog
+        Log.CloseAndFlush();
         Environment.Exit(0);
     }
 
