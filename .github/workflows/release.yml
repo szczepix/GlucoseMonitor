@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_ARCHIVE: GlucoseMonitor-win-x64.zip
+  MOCK_ARCHIVE: GlucoseMonitor.MockServer-win-x64.zip
+
 jobs:
   build:
     runs-on: windows-latest
@@ -44,21 +48,21 @@ jobs:
 
       # Create ZIP archives
       - name: Create application archive
-        run: Compress-Archive -Path ./publish/app/* -DestinationPath ./GlucoseMonitor-win-x64.zip
+        run: Compress-Archive -Path ./publish/app/* -DestinationPath ./${{ env.APP_ARCHIVE }}
 
       - name: Create MockServer archive
-        run: Compress-Archive -Path ./publish/mockserver/* -DestinationPath ./GlucoseMonitor.MockServer-win-x64.zip
+        run: Compress-Archive -Path ./publish/mockserver/* -DestinationPath ./${{ env.MOCK_ARCHIVE }}
 
       # Generate checksums for security verification
       - name: Generate checksums
         shell: pwsh
         run: |
-          $appHash = (Get-FileHash -Path ./GlucoseMonitor-win-x64.zip -Algorithm SHA256).Hash.ToLower()
-          $mockHash = (Get-FileHash -Path ./GlucoseMonitor.MockServer-win-x64.zip -Algorithm SHA256).Hash.ToLower()
+          $appHash = (Get-FileHash -Path ./${{ env.APP_ARCHIVE }} -Algorithm SHA256).Hash.ToLower()
+          $mockHash = (Get-FileHash -Path ./${{ env.MOCK_ARCHIVE }} -Algorithm SHA256).Hash.ToLower()
 
           @"
-          $appHash  GlucoseMonitor-win-x64.zip
-          $mockHash  GlucoseMonitor.MockServer-win-x64.zip
+          $appHash  ${{ env.APP_ARCHIVE }}
+          $mockHash  ${{ env.MOCK_ARCHIVE }}
           "@ | Out-File -FilePath ./checksums.txt -Encoding utf8
 
           Write-Host "Generated checksums:"
@@ -83,8 +87,8 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
           files: |
-            ./GlucoseMonitor-win-x64.zip
-            ./GlucoseMonitor.MockServer-win-x64.zip
+            ./${{ env.APP_ARCHIVE }}
+            ./${{ env.MOCK_ARCHIVE }}
             ./checksums.txt
           generate_release_notes: true
           draft: false

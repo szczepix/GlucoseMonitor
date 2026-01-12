@@ -40,8 +40,8 @@ public class ReleaseInfo
                 int.TryParse(parts[1], out var month) &&
                 int.TryParse(parts[2], out var day))
             {
-                // Convert to comparable version: year.monthday.0.0
-                return new Version(year, month * 100 + day, 0, 0);
+                // Convert to comparable version: year.month.day.0
+                return new Version(year, month, day, 0);
             }
         }
 

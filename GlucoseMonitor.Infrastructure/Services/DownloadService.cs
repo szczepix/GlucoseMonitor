@@ -15,7 +15,7 @@ public class DownloadService : IDownloadService
 {
     private readonly HttpClient _httpClient;
     private readonly Serilog.ILogger _logger;
-    private const int BufferSize = 81920; // 80KB buffer for efficient streaming
+    private const int BufferSize = 81920; // 80 KiB buffer for efficient streaming
 
     public DownloadService(Serilog.ILogger logger)
     {
