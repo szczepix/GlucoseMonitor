@@ -2,9 +2,14 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -12,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -33,10 +40,27 @@ jobs:
       - name: Create zip archive
         run: Compress-Archive -Path ./publish/* -DestinationPath ./GlucoseMonitor-win-x64.zip
 
+      - name: Generate version tag
+        id: version
+        run: |
+          $date = Get-Date -Format "yyyy.MM.dd"
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $tag = if ("${{ github.ref }}".StartsWith("refs/tags/")) {
+            "${{ github.ref_name }}"
+          } else {
+            "v$date-$shortSha"
+          }
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "Generated tag: $tag"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
           files: ./GlucoseMonitor-win-x64.zip
           generate_release_notes: true
+          draft: false
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
