@@ -421,6 +421,7 @@ $ErrorActionPreference = 'Stop'
 $appDir = '{appDir.Replace("'", "''")}'
 $extractDir = '{extractDir.Replace("'", "''")}'
 $tempDir = '{tempDir.Replace("'", "''")}'
+# Process name without .exe extension (Get-Process uses this format)
 $processName = 'GlucoseMonitor.UI'
 
 # Wait for app to exit
