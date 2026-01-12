@@ -142,6 +142,6 @@ Or switch to WPF (easier migration path):
 
 ## Notes
 
-- WinUI 3 1.8 includes new AI APIs for Copilot+ PCs (optional to use)
+- AI APIs for Copilot+ PCs are provided via the Windows AI SDK and can be used alongside WinUI 3 1.8 if needed
 - Windows App SDK is now a metapackage - can use individual component packages if needed
 - For self-contained installs, the publish folder contains all required runtime files
