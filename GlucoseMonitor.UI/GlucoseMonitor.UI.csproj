@@ -11,9 +11,10 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Platforms>x64;x86;ARM64</Platforms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Self-contained deployment: bundle .NET runtime and Windows App SDK -->
-    <SelfContained>true</SelfContained>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Framework-dependent deployment: requires .NET 9 installed -->
+    <!-- Note: Self-contained WinUI 3 causes crashes, using FDD for reliability -->
+    <SelfContained>false</SelfContained>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
   </PropertyGroup>
 
   <ItemGroup>
