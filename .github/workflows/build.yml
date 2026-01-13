@@ -40,14 +40,21 @@ jobs:
       - name: Test
         run: dotnet test --no-build -c Release --verbosity normal
 
+      # Restore packages specifically for win-x64 runtime before publishing
+      - name: Restore for win-x64 runtime
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        run: |
+          dotnet restore GlucoseMonitor.UI -r win-x64
+          dotnet restore GlucoseMonitor.MockServer -r win-x64
+
       # Publish self-contained build for testing (on workflow_dispatch or copilot/* branches)
       - name: Publish GlucoseMonitor.UI (self-contained)
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
-        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o ./publish/app
+        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true --no-restore -o ./publish/app
 
       - name: Publish GlucoseMonitor.MockServer (self-contained)
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
-        run: dotnet publish GlucoseMonitor.MockServer -c Release -r win-x64 --self-contained true -o ./publish/mockserver
+        run: dotnet publish GlucoseMonitor.MockServer -c Release -r win-x64 --self-contained true --no-restore -o ./publish/mockserver
 
       # Upload artifacts for testing
       - name: Upload GlucoseMonitor.UI artifact

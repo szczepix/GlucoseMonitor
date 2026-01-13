@@ -38,14 +38,20 @@ jobs:
       - name: Run tests
         run: dotnet test --no-build -c Release
 
+      # Restore packages specifically for win-x64 runtime before publishing
+      - name: Restore for win-x64 runtime
+        run: |
+          dotnet restore GlucoseMonitor.UI -r win-x64
+          dotnet restore GlucoseMonitor.MockServer -r win-x64
+
       # Publish main application as self-contained single executable
       # Bundles .NET 9 runtime and Windows App SDK - no installation required
       - name: Publish GlucoseMonitor.UI (self-contained single file)
-        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o ./publish/app
+        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true --no-restore -o ./publish/app
 
       # Publish MockServer as standalone tool
       - name: Publish GlucoseMonitor.MockServer (self-contained)
-        run: dotnet publish GlucoseMonitor.MockServer -c Release -r win-x64 --self-contained true -o ./publish/mockserver
+        run: dotnet publish GlucoseMonitor.MockServer -c Release -r win-x64 --self-contained true --no-restore -o ./publish/mockserver
 
       # Create ZIP archives
       - name: Create application archive
