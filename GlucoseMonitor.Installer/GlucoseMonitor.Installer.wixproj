@@ -5,8 +5,8 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <!-- Pass MSBuild property as WiX preprocessor variable -->
     <DefineConstants>WixUILicenseRtf=license.rtf;HarvestDirectory=$(HarvestDirectory)</DefineConstants>
-    <!-- Default directory where we harvest application files from -->
-    <HarvestDirectory>..\GlucoseMonitor.UI\bin\$(Configuration)\net9.0-windows</HarvestDirectory>
+    <!-- Default directory where we harvest application files from (self-contained publish) -->
+    <HarvestDirectory>..\GlucoseMonitor.UI\bin\$(Configuration)\net9.0-windows10.0.26100.0\win-x64\publish</HarvestDirectory>
   </PropertyGroup>
 
 </Project>

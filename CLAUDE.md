@@ -54,8 +54,8 @@ dotnet build -c Release
 ### Installer Commands
 
 ```bash
-# Publish self-contained single-file
-dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true
+# Publish self-contained (bundles all dependencies)
+dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true -o GlucoseMonitor.UI/bin/Release/net9.0-windows10.0.26100.0/win-x64/publish
 
 # Build MSI installer (after publishing)
 dotnet build GlucoseMonitor.Installer\GlucoseMonitor.Installer.wixproj -c Release -p:HarvestDirectory="GlucoseMonitor.UI\\bin\\Release\\net9.0-windows10.0.26100.0\\win-x64\\publish"
@@ -86,5 +86,5 @@ All user data in `%APPDATA%\GlucoseMonitor\`:
 ## Platform Requirements
 
 - **OS**: Windows 11 22H2+ (build 22621)
-- **Framework**: .NET 9
+- **Framework**: Self-contained deployment (no .NET installation required)
 - **Build**: Requires Visual Studio components for WinUI 3 (Windows App SDK 1.8)

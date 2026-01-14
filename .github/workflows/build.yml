@@ -2,9 +2,22 @@ name: Build
 
 on:
   push:
-    branches: [main, feature/*]
+    branches: [main, feature/*, copilot/*]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_artifacts:
+        description: 'Build and upload artifacts for testing'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  APP_ARTIFACT: GlucoseMonitor-win-x64-build-${{ github.sha }}
 
 jobs:
   build:
@@ -26,3 +39,49 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build -c Release --verbosity normal
+
+      # Restore packages specifically for win-x64 runtime before publishing
+      - name: Restore for win-x64 runtime
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        run: |
+          dotnet restore GlucoseMonitor.UI -r win-x64
+          dotnet restore GlucoseMonitor.MockServer -r win-x64
+
+      # Publish self-contained build for testing (on workflow_dispatch or copilot/* branches)
+      - name: Publish GlucoseMonitor.UI (self-contained)
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        run: dotnet publish GlucoseMonitor.UI -c Release -r win-x64 --self-contained true --no-restore -o ./publish/app
+
+      - name: Publish GlucoseMonitor.MockServer (self-contained)
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        run: dotnet publish GlucoseMonitor.MockServer -c Release -r win-x64 --self-contained true --no-restore -o ./publish/mockserver
+
+      # Upload artifacts for testing
+      - name: Upload GlucoseMonitor.UI artifact
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlucoseMonitor-UI-win-x64
+          path: ./publish/app/*
+          retention-days: 7
+
+      - name: Upload GlucoseMonitor.MockServer artifact
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlucoseMonitor-MockServer-win-x64
+          path: ./publish/mockserver/*
+          retention-days: 7
+
+      # Create ZIP archive for easy download
+      - name: Create application archive
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        run: Compress-Archive -Path ./publish/app/* -DestinationPath ./GlucoseMonitor-win-x64.zip
+
+      - name: Upload ZIP artifact
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/copilot/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlucoseMonitor-win-x64-zip
+          path: ./GlucoseMonitor-win-x64.zip
+          retention-days: 7
